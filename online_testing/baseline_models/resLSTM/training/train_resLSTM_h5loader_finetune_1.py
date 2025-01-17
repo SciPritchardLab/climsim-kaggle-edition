@@ -27,6 +27,7 @@ from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
+from soap import SOAP
 from torch.nn.utils import clip_grad_norm_
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
@@ -179,6 +180,10 @@ def main(cfg: DictConfig) -> float:
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
     if cfg.optimizer == 'AdamW':
         optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
+    if cfg.optimizer == 'RAdam':
+        optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
+    if cfg.optimizer == 'SOAP':
+        optimizer = SOAP(model.parameters(), lr = cfg.learning_rate, betas=(.95, .95), weight_decay=.01, precondition_frequency=10)
     if optimizer is None:
         raise ValueError('Optimizer not implemented')
     
