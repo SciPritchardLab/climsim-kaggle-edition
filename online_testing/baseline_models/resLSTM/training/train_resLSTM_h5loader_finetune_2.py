@@ -30,7 +30,6 @@ import gc
 from soap import SOAP
 from torch.nn.utils import clip_grad_norm_
 
-# config_name gets overwritten in the SLURM script
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
 
@@ -223,12 +222,12 @@ def main(cfg: DictConfig) -> float:
         # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
         def vert_diff(col):
             return col[:,1:60] - col[:,0:59]
-        custom_loss = criterion(pred, target)
-        custom_loss += criterion(vert_diff(pred[:,0:60]), vert_diff(target[:,0:60]))
-        custom_loss += criterion(vert_diff(pred[:,60:120]), vert_diff(target[:,60:120]))
+        custom_loss = criterion(pred[:,120:180], target[:,120:180])
+        # custom_loss += criterion(vert_diff(pred[:,0:60]), vert_diff(target[:,0:60]))
+        # custom_loss += criterion(vert_diff(pred[:,60:120]), vert_diff(target[:,60:120]))
         custom_loss += criterion(vert_diff(pred[:,120:180]), vert_diff(target[:,120:180]))
-        custom_loss += criterion(vert_diff(pred[:,180:240]), vert_diff(target[:,180:240]))
-        custom_loss += criterion(vert_diff(pred[:,240:300]), vert_diff(target[:,240:300]))
+        # custom_loss += criterion(vert_diff(pred[:,180:240]), vert_diff(target[:,180:240]))
+        # custom_loss += criterion(vert_diff(pred[:,240:300]), vert_diff(target[:,240:300]))
         return custom_loss
     
     # Initialize the console logger
