@@ -96,13 +96,13 @@ class pao_model(modulus.Module):
             nn.Linear(self.num_hidden, self.num_scalar_targets)
         )
 
-    def forward(self, scalar_features, seq_featuras):
+    def forward(self, seq_features, scalar_features):
         # concat dim60 cols
         dim60_x = []
         scale_ix = 0
         # for group_ix in range(len(FEATURE_SEQ_GROUPS) * 2):
         for group_ix in range((self.num_seq_inputs+3) * 1):
-            origin_x = seq_features[:, group_ix, :]
+            origin_x = seq_features[:, group_ix, :] # (batch, 60)
             x = self.feature_scale[scale_ix](origin_x)  # (batch, 60)
             scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
@@ -124,8 +124,8 @@ class pao_model(modulus.Module):
             dim60_x.append(x_diff_diff)
 
         x = torch.cat(dim60_x, dim=2)  # (batch, 60, M)
-        position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (batch, 60)
-        position = self.positional_encoding(position)  # (batch, 60, 16)
+        position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
+        position = self.positional_encoding(position)  # (batch, 60, 128)
         x = self.input_linear(x)  # (batch, seq_len, 128)
         x = x + position
         # other cols
@@ -155,61 +155,3 @@ class pao_model(modulus.Module):
         scalar_x = self.scalar_layer_norm(scaler_x)
         scalar_output = self.scalar_output_mlp(scaler_x)
         return seq_output, scalar_output, seq_diff_output
-
-
-def train_one_epoch(model, loss_fn, data_loader, optimizer,
-                    device, scheduler, epoch, scaler=None, awp=None, ema=None):
-    # get batch data loop
-    epoch_loss = 0
-    epoch_data_num = len(data_loader.dataset)
-
-    model.train()
-
-    bar = tqdm(enumerate(data_loader), total=len(data_loader))
-
-    scaler_weight_arr = np.asarray([new_weight[c] for c in TARGET_SCALER_COLS])
-    seq_weight_arr = np.asarray([[new_weight[f"{c}_{i}"] for c in TARGET_SEQ_GROUPS] for i in range(60)])
-    scaler_weight_mask = np.where(scaler_weight_arr == 0, 0, 1)
-    seq_weight_mask = np.where(seq_weight_arr == 0, 0, 1)
-    seq_weight_mask[12:27, TARGET_SEQ_GROUPS.index("ptend_q0002")] = 0.0
-    scaler_weight_mask = torch.tensor(scaler_weight_mask, dtype=torch.float).to(device)
-    seq_weight_mask = torch.tensor(seq_weight_mask, dtype=torch.float).to(device)
-
-    for iter_i, batch in bar:
-        # input
-        seq_features = batch["seq_features"].to(device)
-        scaler_features = batch["scaler_features"].to(device)
-        seq_targets = batch["seq_targets"].to(device)
-        scaler_targets = batch["scaler_targets"].to(device)
-        seq_targets_diff = batch["seq_targets_diff"].to(device)
-        batch_size = len(scaler_targets)
-
-        # zero grad
-        optimizer.zero_grad()
-
-        with torch.set_grad_enabled(True):
-            with amp.autocast(enabled=CFG.use_fp16):
-                seq_preds, scaler_preds, seq_diff_preds = model(scaler_features, seq_features)
-                # mask
-                seq_preds = seq_preds * seq_weight_mask
-                scaler_preds = scaler_preds * scaler_weight_mask
-                seq_diff_preds = seq_diff_preds * seq_weight_mask
-                scaler_targets = scaler_targets * scaler_weight_mask
-                seq_targets = seq_targets * seq_weight_mask
-                seq_targets_diff = seq_targets_diff * seq_weight_mask
-                # loss function
-                seq_loss = loss_fn(seq_preds.reshape(-1), seq_targets.reshape(-1))
-                scaler_loss = loss_fn(scaler_preds.reshape(-1), scaler_targets.reshape(-1))
-                seq_diff_loss = loss_fn(seq_diff_preds.reshape(-1), seq_targets_diff.reshape(-1))
-                loss = seq_loss + scaler_loss + seq_diff_loss
-            scalar.scale(loss).backward()
-            scalar.step(optimizer)
-            scalar.update()
-            scheduler.step()
-            ema.update(model)
-            epoch_loss += loss.item()
-        
-        bar.set_postfix(OrderedDict(loss=loss.item(), lr=optimizer.param_groups[0]['lr']))
-    
-    epoch_loss_per_data = epoch_loss / epoch_data_num
-    return epoch_loss_per_data

@@ -30,6 +30,63 @@ import gc
 from soap import SOAP
 from torch.nn.utils import clip_grad_norm_
 
+def train_one_epoch(model, loss_fn, data_loader, optimizer,
+                    device, scheduler, epoch, scaler=None, awp=None, ema=None):
+    # get batch data loop
+    epoch_loss = 0
+    epoch_data_num = len(data_loader.dataset)
+
+    model.train()
+
+    bar = tqdm(enumerate(data_loader), total=len(data_loader))
+
+    scaler_weight_arr = np.asarray([new_weight[c] for c in TARGET_SCALER_COLS])
+    seq_weight_arr = np.asarray([[new_weight[f"{c}_{i}"] for c in TARGET_SEQ_GROUPS] for i in range(60)])
+    scaler_weight_mask = np.where(scaler_weight_arr == 0, 0, 1)
+    seq_weight_mask = np.where(seq_weight_arr == 0, 0, 1)
+    seq_weight_mask[12:27, TARGET_SEQ_GROUPS.index("ptend_q0002")] = 0.0
+    scaler_weight_mask = torch.tensor(scaler_weight_mask, dtype=torch.float).to(device)
+    seq_weight_mask = torch.tensor(seq_weight_mask, dtype=torch.float).to(device)
+
+    for iter_i, batch in bar:
+        # input
+        seq_features = batch["seq_features"].to(device)
+        scaler_features = batch["scaler_features"].to(device)
+        seq_targets = batch["seq_targets"].to(device)
+        scaler_targets = batch["scaler_targets"].to(device)
+        seq_targets_diff = batch["seq_targets_diff"].to(device)
+        batch_size = len(scaler_targets)
+
+        # zero grad
+        optimizer.zero_grad()
+
+        with torch.set_grad_enabled(True):
+            with amp.autocast(enabled=CFG.use_fp16):
+                seq_preds, scaler_preds, seq_diff_preds = model(scaler_features, seq_features)
+                # mask
+                seq_preds = seq_preds * seq_weight_mask
+                scaler_preds = scaler_preds * scaler_weight_mask
+                seq_diff_preds = seq_diff_preds * seq_weight_mask
+                scaler_targets = scaler_targets * scaler_weight_mask
+                seq_targets = seq_targets * seq_weight_mask
+                seq_targets_diff = seq_targets_diff * seq_weight_mask
+                # loss function
+                seq_loss = loss_fn(seq_preds.reshape(-1), seq_targets.reshape(-1))
+                scaler_loss = loss_fn(scaler_preds.reshape(-1), scaler_targets.reshape(-1))
+                seq_diff_loss = loss_fn(seq_diff_preds.reshape(-1), seq_targets_diff.reshape(-1))
+                loss = seq_loss + scaler_loss + seq_diff_loss
+            scalar.scale(loss).backward()
+            scalar.step(optimizer)
+            scalar.update()
+            scheduler.step()
+            ema.update(model)
+            epoch_loss += loss.item()
+        
+        bar.set_postfix(OrderedDict(loss=loss.item(), lr=optimizer.param_groups[0]['lr']))
+    
+    epoch_loss_per_data = epoch_loss / epoch_data_num
+    return epoch_loss_per_data
+
 # config_name gets overwritten in the SLURM script
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
