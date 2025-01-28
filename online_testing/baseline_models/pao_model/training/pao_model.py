@@ -5,67 +5,33 @@ import torch.nn as nn
 from dataclasses import dataclass
 import modulus
 import nvtx
+from layers import (
+    FeatureScale,
+    ResidualBlock,
+)
 from torch.nn.functional import silu
 from typing import List
 
 """
-Contains the code for the resLSTM and its training.
+Contains the code for the Pao model and its training.
 """
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class resLSTM_metadata(modulus.ModelMetaData):
-    name: str = "resLSTM"
+class pao_model_metadata(modulus.ModelMetaData):
+    name: str = "pao_model"
     # Optimization
     jit: bool = True
     cuda_graphs: bool = True
     amp_cpu: bool = True
     amp_gpu: bool = True
 
-
-class FeatureScale(nn.Module):
-    def __init__(self, input_dim):
-        super(FeatureScale, self).__init__()
-        self.weights = nn.Parameter(torch.ones(input_dim))
-        self.biases = nn.Parameter(torch.zeros(input_dim))
-        
-    def forward(self, x):
-        # 各次元ごとに対応するパラメータを掛ける
-        return x * self.weights + self.biases
-
-
-class ResidualBlock(nn.Module):
-    def __init__(self, in_features, out_features, kernel_size, stride, padding):
-        super(ResidualBlock, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv1d(in_features, out_features, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.BatchNorm1d(out_features),
-            # nn.ReLU(),
-            nn.GELU(),
-            nn.Conv1d(out_features, out_features, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.BatchNorm1d(out_features),
-            # nn.ReLU()
-            nn.GELU()
-        )
-        self.transformer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(out_features, nhead=8, dim_feedforward=out_features, dropout=0.0, batch_first=True),
-            num_layers=1,
-        )
-
-
-    def forward(self, x):
-        out = self.conv(x)
-        out = out + x
-        out = out.transpose(1, 2)
-        out = self.transformer(out)
-        out = out.transpose(1, 2)
-        return out
-
-
-class LeapModel(nn.Module):
-    def __init__(self):
-        super(LeapModel, self).__init__()
+class pao_model(modulus.Module):
+    def __init__(self,
+                 inputs_dim: int = 42, # number of sequences):
+                ):
+        super(pao_model, self).__init__()
         # 60 sequences 1d cnn
         self.feature_scale = nn.ModuleList([
             FeatureScale(60) for _ in range((len(FEATURE_SEQ_GROUPS)+3) * 3 * 1)
