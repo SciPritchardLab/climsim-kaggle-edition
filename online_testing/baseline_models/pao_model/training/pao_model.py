@@ -48,7 +48,7 @@ class pao_model(modulus.Module):
         self.positional_encoding = nn.Embedding(60, 128)
         self.input_linear = nn.Linear((self.num_seq_inputs+3) * 3 * 1, 128)  # current, diff
         self.other_feats_mlp = nn.Sequential(
-            nn.Linear(len(FEATURE_SCALER_COLS), self.num_hidden),
+            nn.Linear(self.num_seq_groups, self.num_hidden),
             nn.BatchNorm1d(self.num_hidden),
             # nn.ReLU(),
             nn.GELU(),
@@ -134,7 +134,7 @@ class pao_model(modulus.Module):
         scalar_x_list = []
         for i in range(60):
             scalar_x_list.append(self.other_feats_proj[i](scalar_x))
-        scaler_x = torch.stack(scaler_x_list, dim=1)  # (batch, 60, hidden)
+        scalar_x = torch.stack(scalar_x_list, dim=1)  # (batch, 60, hidden)
         # repeat to match seq_len
         # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, seq_len, hidden)
         # concat
@@ -153,7 +153,7 @@ class pao_model(modulus.Module):
         # scalar_head
         scalar_x = x.reshape(x.size(0), -1)
         scalar_x = self.scalar_layer_norm(scaler_x)
-        scaler_output = self.scalar_output_mlp(scaler_x)
+        scalar_output = self.scalar_output_mlp(scaler_x)
         return seq_output, scalar_output, seq_diff_output
 
 
@@ -202,9 +202,9 @@ def train_one_epoch(model, loss_fn, data_loader, optimizer,
                 scaler_loss = loss_fn(scaler_preds.reshape(-1), scaler_targets.reshape(-1))
                 seq_diff_loss = loss_fn(seq_diff_preds.reshape(-1), seq_targets_diff.reshape(-1))
                 loss = seq_loss + scaler_loss + seq_diff_loss
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            scalar.scale(loss).backward()
+            scalar.step(optimizer)
+            scalar.update()
             scheduler.step()
             ema.update(model)
             epoch_loss += loss.item()
