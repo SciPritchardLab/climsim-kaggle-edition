@@ -150,11 +150,11 @@ class pao_model(modulus.Module):
         seq_output = self.seq_output_mlp(x)  # (batch, seq_len * 2, n_targets)
         seq_diff_output = seq_output[:, :, self.num_seq_targets:]
         seq_output = seq_output[:, :, :self.num_seq_targets]
-        # scaler_head
-        scaler_x = x.reshape(x.size(0), -1)
-        scaler_x = self.scaler_layer_norm(scaler_x)
-        scaler_output = self.scaler_output_mlp(scaler_x)
-        return seq_output, scaler_output, seq_diff_output
+        # scalar_head
+        scalar_x = x.reshape(x.size(0), -1)
+        scalar_x = self.scalar_layer_norm(scaler_x)
+        scaler_output = self.scalar_output_mlp(scaler_x)
+        return seq_output, scalar_output, seq_diff_output
 
 
 def train_one_epoch(model, loss_fn, data_loader, optimizer,
