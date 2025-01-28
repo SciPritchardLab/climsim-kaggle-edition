@@ -35,7 +35,7 @@ class pao_model(modulus.Module):
                  num_scalar_targets: int = 8, # number of target scalars
                  num_hidden: int = 128, # number of hidden units in MLP
                 ):
-        super(pao_model, self).__init__()
+        super().__init__(meta = pao_model_metadata())
         self.num_seq_inputs = num_seq_inputs
         self.num_scalar_inputs = num_scalar_inputs
         self.num_seq_targets = num_seq_targets
@@ -60,7 +60,7 @@ class pao_model(modulus.Module):
         self.other_feats_proj = nn.ModuleList([nn.Linear(self.num_hidden, self.num_hidden) for _ in range(60)])
         # layer norm
         self.layer_norm_in = self.num_hidden * 2
-        self.seq_layer_norm = nn.LayerNorm(layer_norm_in)
+        self.seq_layer_norm = nn.LayerNorm(self.layer_norm_in)
         # cnn
         self.num_cnn_hidden = self.num_hidden * 2
         self.cnn1 = nn.Sequential(
