@@ -33,12 +33,14 @@ class pao_model(modulus.Module):
                  num_scalar: int = 19, # number of scalars
                 ):
         super(pao_model, self).__init__()
+        self.num_seq = num_seq
+        self.num_scalar = num_scalar
         # 60 sequences 1d cnn
         self.feature_scale = nn.ModuleList([
-            FeatureScale(60) for _ in range((len(FEATURE_SEQ_GROUPS)+3) * 3 * 1)
+            FeatureScale(60) for _ in range((num_seq+3) * 3 * 1)
         ])
         self.positional_encoding = nn.Embedding(60, 128)
-        self.input_linear = nn.Linear((len(FEATURE_SEQ_GROUPS)+3) * 3 * 1, 128)  # current, diff
+        self.input_linear = nn.Linear((num_seq+3) * 3 * 1, 128)  # current, diff
         n_hidden = 128
         self.other_feats_mlp = nn.Sequential(
             nn.Linear(len(FEATURE_SCALER_COLS), n_hidden),
