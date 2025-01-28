@@ -143,7 +143,7 @@ class dataset_train(Dataset):
         mask = np.ones(1405, dtype = bool)
         indices_to_exclude = [-1, -4, -5, -6, -7, -8]
         # exclude  tm_state_ps, tm_pbuf_SOLIN, tm_pbuf_SHFLX, tm_pbuf_LHFLX, tm_pbuf_COSZRS, icol
-        # these variables are not supported in the current E3SM implementation
+        # these variables are not supported in the current E3SM implementation and are excluded from v6 data
         mask[indices_to_exclude] = False
         x = x[mask]
         # end of hacky part for 'v6' data
