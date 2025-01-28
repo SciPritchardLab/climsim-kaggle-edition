@@ -29,7 +29,8 @@ class pao_model_metadata(modulus.ModelMetaData):
 
 class pao_model(modulus.Module):
     def __init__(self,
-                 inputs_dim: int = 42, # number of sequences):
+                 num_seq: int = 23, # number of sequences
+                 num_scalar: int = 19, # number of scalars
                 ):
         super(pao_model, self).__init__()
         # 60 sequences 1d cnn

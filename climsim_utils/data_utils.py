@@ -673,6 +673,19 @@ class data_utils:
         self.full_vars = False
         self.full_vars_v5 = True
 
+    def set_to_v6_vars(self):
+        '''
+        This function sets the inputs and outputs to the V6 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v5_inputs
+        self.target_vars = self.v5_outputs
+        self.ps_index = 1380
+        self.input_feature_len = 1399
+        self.target_feature_len = 308
+        self.full_vars = False
+        self.full_vars_v5 = True
+
     def get_xrdata(self, file, file_vars = None):
         '''
         This function reads in a file and returns an xarray dataset with the variables specified.
