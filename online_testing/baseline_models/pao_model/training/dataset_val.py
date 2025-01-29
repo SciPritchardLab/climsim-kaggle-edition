@@ -7,12 +7,11 @@
 from torch.utils.data import Dataset
 import numpy as np
 import torch
-import glob
-import h5py
 
-class dataset_train(Dataset):
+class dataset_val(Dataset):
     def __init__(self, 
-                 parent_path, 
+                 input_paths, 
+                 target_paths, 
                  input_sub, 
                  input_div, 
                  out_scale, 
@@ -32,7 +31,8 @@ class dataset_train(Dataset):
                  qn_logtransform=False):
         """
         Args:
-            parent_path (str): Path to the .zarr file containing the inputs and targets.
+            input_paths (str): Path to the .npy file containing the inputs.
+            target_paths (str): Path to the .npy file containing the targets.
             input_sub (np.ndarray): Input data mean.
             input_div (np.ndarray): Input data standard deviation.
             out_scale (np.ndarray): Output data standard deviation.
@@ -42,34 +42,10 @@ class dataset_train(Dataset):
             qc_lbd (np.ndarray): Coefficients for the exponential transformation of qc.
             qi_lbd (np.ndarray): Coefficients for the exponential transformation of qi.
         """
-        self.parent_path = parent_path
-        self.input_paths = glob.glob(f'{parent_path}/**/train_input.h5', recursive=True)
-        print('input paths:', self.input_paths)
-        if not self.input_paths:
-            raise FileNotFoundError("No 'train_input.h5' files found under the specified parent path.")
-        self.target_paths = [path.replace('train_input.h5', 'train_target.h5') for path in self.input_paths]
-
-        # Initialize lists to hold the samples count per file
-        self.samples_per_file = []
-        for input_path in self.input_paths:
-            with h5py.File(input_path, 'r') as file:  # Open the file to read the number of samples
-                # Assuming dataset is named 'data', adjust if different
-                self.samples_per_file.append(file['data'].shape[0])
-                
-        self.cumulative_samples = np.cumsum([0] + self.samples_per_file)
-        self.total_samples = self.cumulative_samples[-1]
-
-        self.input_files = {}
-        self.target_files = {}
-        for input_path, target_path in zip(self.input_paths, self.target_paths):
-            self.input_files[input_path] = h5py.File(input_path, 'r')
-            self.target_files[target_path] = h5py.File(target_path, 'r')
-
-        # for input_path, target_path in zip(self.input_paths, self.target_paths):
-        #     # Lazily open zarr files and keep the reference
-        #     self.input_zarrs[input_path] = zarr.open(input_path, mode='r')
-        #     self.target_zarrs[target_path] = zarr.open(target_path, mode='r')
-        
+        self.inputs = np.load(input_paths)
+        self.targets = np.load(target_paths)
+        self.input_paths = input_paths
+        self.target_paths = target_paths
         self.input_sub = input_sub
         self.input_div = input_div
         self.out_scale = out_scale
@@ -80,7 +56,6 @@ class dataset_train(Dataset):
         self.qn_lbd = qn_lbd
         self.decouple_cloud = decouple_cloud
         self.aggressive_pruning = aggressive_pruning
-        # self.strato_lev_qc = strato_lev_qc
         self.input_clip = input_clip
         if strato_lev_qinput <0:
             self.strato_lev_qinput = strato_lev
@@ -90,19 +65,10 @@ class dataset_train(Dataset):
         self.input_clip_rhonly = input_clip_rhonly
         self.qn_tscaled = qn_tscaled
         self.qn_logtransform = qn_logtransform
-        
+
         if self.strato_lev_qinput <self.strato_lev:
             raise ValueError('strato_lev_qinput should be greater than or equal to strato_lev, otherwise inconsistent with E3SM')
 
-
-    def __len__(self):
-        return self.total_samples
-    
-    def _find_file_and_index(self, idx):
-        file_idx = np.searchsorted(self.cumulative_samples, idx+1) - 1
-        local_idx = idx - self.cumulative_samples[file_idx]
-        return file_idx, local_idx
-    
     def t_scaled_weight(self, t):
         # Polynomial coefficients
         a = 1.043084e-12
@@ -121,46 +87,27 @@ class dataset_train(Dataset):
         y = np.where(t > t_max, y_max, y)
         return y_max/y
 
+    def __len__(self):
+        return len(self.inputs)
+
     def __getitem__(self, idx):
-        if idx < 0 or idx >= self.total_samples:
-            raise IndexError("Index out of bounds")
-        # Find which file the index falls into
-        # file_idx = np.searchsorted(self.cumulative_samples, idx+1) - 1
-        # local_idx = idx - self.cumulative_samples[file_idx]
+        x = self.inputs[idx]
+        y = self.targets[idx]
 
-        # x = zarr.open(self.input_paths[file_idx], mode='r')[local_idx]
-        # y = zarr.open(self.target_paths[file_idx], mode='r')[local_idx]
-        file_idx, local_idx = self._find_file_and_index(idx)
-
-
-        # x = self.input_zarrs[self.input_paths[file_idx]][local_idx]
-        # y = self.target_zarrs[self.target_paths[file_idx]][local_idx]
-        # Open the HDF5 files and read the data for the given index
-        input_file = self.input_files[self.input_paths[file_idx]]
-        target_file = self.target_files[self.target_paths[file_idx]]
-        x = input_file['data'][local_idx]
-        # start of hacky part for 'v6' data
-        mask = np.ones(1405, dtype = bool)
-        indices_to_exclude = [-1, -4, -5, -6, -7, -8]
-        # exclude  tm_state_ps, tm_pbuf_SOLIN, tm_pbuf_SHFLX, tm_pbuf_LHFLX, tm_pbuf_COSZRS, icol
-        # these variables are not supported in the current E3SM implementation and are excluded from v6 data
-        mask[indices_to_exclude] = False
-        x = x[mask]
-        # end of hacky part for 'v6' data
-        y = target_file['data'][local_idx]
         if self.qn_tscaled:
             # use temperature to generate weights for scaling qn
             qn_scale_weight = self.t_scaled_weight(x[0:60])
 
-        # x = np.load(self.input_paths,mmap_mode='r')[idx]
-        # y = np.load(self.target_paths,mmap_mode='r')[idx]
         if not self.qn_logtransform:
             x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
-        # Avoid division by zero in input_div and set corresponding x to 0
-        # input_div_nonzero = self.input_div != 0
-        # x = np.where(input_div_nonzero, (x - self.input_sub) / self.input_div, 0)
-        x = (x - self.input_sub) / self.input_div
-        #make all inf and nan values 0
+        
+        # start of hacky part for 'v6' data
+        mask = np.ones(1405, dtype = bool)
+        indices_to_exclude = [-1, -4, -5, -6, -7, -8]
+        mask[indices_to_exclude] = False
+        x = (x[mask] - self.input_sub) / self.input_div
+        # end of hacky part for 'v6' data
+
         x[np.isnan(x)] = 0
         x[np.isinf(x)] = 0
 
@@ -169,7 +116,7 @@ class dataset_train(Dataset):
             x[120:180] = 0
             x[60*14:60*15] =0
             x[60*18:60*19] =0
-        
+
         if self.aggressive_pruning:
             # for profiles, only keep stratosphere temperature. prune all other profiles in stratosphere
             x[60:60+self.strato_lev_qinput] = 0 # prune RH
@@ -193,8 +140,8 @@ class dataset_train(Dataset):
             x[1140:1140+self.strato_lev] = 0
             x[1395] = 0 #SNOWHICE
         elif self.qinput_prune:
-            # raise NotImplementedError('should use aggressive_pruning! instead of qinput_prune!')
-            #x[:,60:60+self.strato_lev] = 0
+            #raise NotImplementedError('should use aggressive_pruning! instead of qinput_prune!')
+            # x[:,60:60+self.strato_lev] = 0
             x[120:120+self.strato_lev] = 0
             # x[180:180+self.strato_lev] = 0
 
@@ -221,11 +168,10 @@ class dataset_train(Dataset):
         output_series_num = 5
         output_single_num = 8
 
-        x_seq_series = x[:input_series_num*60].reshape(input_series_num,60).transpose()
-        x_seq_single = np.tile(x[input_series_num*60:], (60,1))
-        x_seq = np.concatenate([x_seq_series, x_seq_single], axis = -1)
+        x_seq_series = x[:input_series_num*60].reshape(input_series_num,60) # (23, 60)
+        x_seq_single = x[input_series_num*60:] # (19)
 
         if self.qn_tscaled:
             return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
         else:
-            return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+            return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)

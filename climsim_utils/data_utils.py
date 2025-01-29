@@ -175,17 +175,6 @@ class data_utils:
                           'pbuf_SOLIN',
                           'pbuf_LHFLX',
                           'pbuf_SHFLX']
-        
-        self.v1_outputs = ['ptend_t',
-                           'ptend_q0001',
-                           'cam_out_NETSW',
-                           'cam_out_FLWDS',
-                           'cam_out_PRECSC',
-                           'cam_out_PRECC',
-                           'cam_out_SOLS',
-                           'cam_out_SOLL',
-                           'cam_out_SOLSD',
-                           'cam_out_SOLLD']
 
         self.v2_inputs = ['state_t',
                           'state_q0001',
@@ -336,15 +325,69 @@ class data_utils:
                             'cam_in_OCNFRAC',
                             'cam_in_SNOWHICE',
                             'cam_in_SNOWHLAND',
-                            'tm_state_ps',
-                            'tm_pbuf_SOLIN',
-                            'tm_pbuf_LHFLX',
-                            'tm_pbuf_SHFLX',
-                            'tm_pbuf_COSZRS',
+                            'tm_state_ps', # exclude -8
+                            'tm_pbuf_SOLIN', # exclude -7
+                            'tm_pbuf_LHFLX', # exclude -6
+                            'tm_pbuf_SHFLX', # exclude -5
+                            'tm_pbuf_COSZRS', # exclude -4 
                             'clat',
                             'slat',
-                            'icol',] 
-                
+                            'icol',] # exclude -1
+
+        self.v6_inputs = ['state_t',
+                            'state_rh',
+                            'state_qn',
+                            'liq_partition',
+                            'state_u',
+                            'state_v',
+                            'state_t_dyn',
+                            'state_q0_dyn',
+                            'state_u_dyn',
+                            'tm_state_t_dyn',
+                            'tm_state_q0_dyn',
+                            'tm_state_u_dyn',
+                            'state_t_prvphy',
+                            'state_q0001_prvphy',
+                            'state_qn_prvphy',
+                            'state_u_prvphy',
+                            'tm_state_t_prvphy',
+                            'tm_state_q0001_prvphy',
+                            'tm_state_qn_prvphy',
+                            'tm_state_u_prvphy',
+                            'pbuf_ozone',
+                            'pbuf_CH4',
+                            'pbuf_N2O',
+                            'state_ps',
+                            'pbuf_SOLIN',
+                            'pbuf_LHFLX',
+                            'pbuf_SHFLX',
+                            'pbuf_TAUX',
+                            'pbuf_TAUY',
+                            'pbuf_COSZRS',
+                            'cam_in_ALDIF',
+                            'cam_in_ALDIR',
+                            'cam_in_ASDIF',
+                            'cam_in_ASDIR',
+                            'cam_in_LWUP',
+                            'cam_in_ICEFRAC',
+                            'cam_in_LANDFRAC',
+                            'cam_in_OCNFRAC',
+                            'cam_in_SNOWHICE',
+                            'cam_in_SNOWHLAND',
+                            'clat',
+                            'slat',]
+
+        self.v1_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD']
+
         self.v2_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_q0002',
@@ -358,7 +401,7 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
         
         self.v4_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -373,7 +416,7 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
         
         self.v5_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -387,7 +430,21 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
+
+        self.v6_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
 
         self.var_lens = {#inputs
                         'state_t':self.num_levels,
@@ -612,6 +669,19 @@ class data_utils:
         self.target_vars = self.v5_outputs
         self.ps_index = 1380
         self.input_feature_len = 1405
+        self.target_feature_len = 308
+        self.full_vars = False
+        self.full_vars_v5 = True
+
+    def set_to_v6_vars(self):
+        '''
+        This function sets the inputs and outputs to the V6 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v5_inputs
+        self.target_vars = self.v5_outputs
+        self.ps_index = 1380
+        self.input_feature_len = 1399
         self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True

@@ -143,7 +143,7 @@ class dataset_train(Dataset):
         mask = np.ones(1405, dtype = bool)
         indices_to_exclude = [-1, -4, -5, -6, -7, -8]
         # exclude  tm_state_ps, tm_pbuf_SOLIN, tm_pbuf_SHFLX, tm_pbuf_LHFLX, tm_pbuf_COSZRS, icol
-        # these variables are not supported in the current E3SM implementation and are excluded from v6 data
+        # these variables are not supported in the current E3SM implementation
         mask[indices_to_exclude] = False
         x = x[mask]
         # end of hacky part for 'v6' data
@@ -221,11 +221,10 @@ class dataset_train(Dataset):
         output_series_num = 5
         output_single_num = 8
 
-        x_seq_series = x[:input_series_num*60].reshape(input_series_num,60).transpose()
-        x_seq_single = np.tile(x[input_series_num*60:], (60,1))
-        x_seq = np.concatenate([x_seq_series, x_seq_single], axis = -1)
+        x_seq_series = x[:input_series_num*60].reshape(input_series_num,60) # (23, 60)
+        x_seq_single = x[input_series_num*60:] # (19)
 
         if self.qn_tscaled:
             return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
         else:
-            return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+            return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
