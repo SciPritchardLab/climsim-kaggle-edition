@@ -222,9 +222,9 @@ class dataset_train(Dataset):
         output_single_num = 8
 
         x_seq_series = x[:input_series_num*60].reshape(input_series_num,60) # (23, 60)
-        x_seq_single = np.tile(x[input_series_num*60:], (60,1)) # (60, 19)
+        x_seq_single = x[input_series_num*60:] # (19)
 
         if self.qn_tscaled:
             return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
         else:
-            return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+            return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
