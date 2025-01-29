@@ -82,9 +82,9 @@ class pao_model(modulus.Module):
             nn.GELU(),
             nn.Linear(self.num_hidden*2, self.num_hidden),
             nn.GELU(),
-            nn.Linear(self.num_hidden, self.num_seq_targets * 2)
+            nn.Linear(self.num_hidden, self.num_seq_targets)
         )
-        self.output_scalar_mlp_input_dim = self.num_cnn_hidden*2*60
+        self.output_scalar_mlp_input_dim = self.num_cnn_hidden * 60
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
         self.scalar_output_mlp = nn.Sequential(
             nn.Linear(self.output_scalar_mlp_input_dim, self.num_hidden),
@@ -145,12 +145,11 @@ class pao_model(modulus.Module):
         x = x.transpose(1, 2)
         x, _ = self.lstm(x)  # (batch, seq_len, hidden)
 
-        # seq_head
         seq_output = self.seq_output_mlp(x)  # (batch, seq_len * 2, n_targets)
         # seq_diff_output = seq_output[:, :, self.num_seq_targets:]
         # seq_output = seq_output[:, :, :self.num_seq_targets]
-        # scalar_head
-        scalar_x = x.reshape(x.size(0), -1)
-        scalar_x = self.scalar_layer_norm(scalar_x)
-        scalar_output = self.scalar_output_mlp(scalar_x)
+        x = x.reshape(x.size(0), -1)
+        x = self.scalar_layer_norm(x)
+        scalar_output = self.scalar_output_mlp(x)
+
         return seq_output, scalar_output
