@@ -43,10 +43,10 @@ class pao_model(modulus.Module):
         self.num_hidden = num_hidden
         # 60 sequences 1d cnn
         self.feature_scale = nn.ModuleList([
-            FeatureScale(60) for _ in range((self.num_seq_inputs+3) * 3 * 1)
+            FeatureScale(60) for _ in range(self.num_seq_inputs)
         ])
-        self.positional_encoding = nn.Embedding(60, 128)
-        self.input_linear = nn.Linear((self.num_seq_inputs+3) * 3 * 1, 128)  # current, diff
+        self.positional_encoding = nn.Embedding(60, self.num_hidden)
+        self.input_linear = nn.Linear(self.num_seq_inputs, self.num_hidden)  # current, diff
         self.other_feats_mlp = nn.Sequential(
             nn.Linear(self.num_scalar_inputs, self.num_hidden),
             nn.BatchNorm1d(self.num_hidden),
@@ -100,30 +100,29 @@ class pao_model(modulus.Module):
         # concat dim60 cols
         dim60_x = []
         scale_ix = 0
-        # for group_ix in range(len(FEATURE_SEQ_GROUPS) * 2):
-        for group_ix in range((self.num_seq_inputs+3) * 1):
+        for group_ix in range((self.num_seq_inputs)):
             origin_x = seq_features[:, group_ix, :] # (batch, 60)
             x = self.feature_scale[scale_ix](origin_x)  # (batch, 60)
             scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
             dim60_x.append(x)
-            # diff feature
-            x_diff = origin_x[:, 1:] - origin_x[:, :-1]  # (batch, 59)
-            x_diff = torch.cat([origin_x.new_zeros(origin_x.size(0), 1), x_diff], dim=1)  # (batch, 60)
-            x_diff = self.feature_scale[scale_ix](x_diff)  # (batch, 60)
-            scale_ix += 1
-            x_diff = x_diff.unsqueeze(-1)  # (batch, 60, 1)
-            dim60_x.append(x_diff)
-            # diff diff feature
-            x_diff = origin_x[:, 1:] - origin_x[:, :-1]
-            x_diff_diff = x_diff[:, 1:] - x_diff[:, :-1]  # (batch, 58)
-            x_diff_diff = torch.cat([origin_x.new_zeros(origin_x.size(0), 2), x_diff_diff], dim=1)  # (batch, 60)
-            x_diff_diff = self.feature_scale[scale_ix](x_diff_diff)  # (batch, 60)
-            scale_ix += 1
-            x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
-            dim60_x.append(x_diff_diff)
+            # # diff feature
+            # x_diff = origin_x[:, 1:] - origin_x[:, :-1]  # (batch, 59)
+            # x_diff = torch.cat([origin_x.new_zeros(origin_x.size(0), 1), x_diff], dim=1)  # (batch, 60)
+            # x_diff = self.feature_scale[scale_ix](x_diff)  # (batch, 60)
+            # scale_ix += 1
+            # x_diff = x_diff.unsqueeze(-1)  # (batch, 60, 1)
+            # dim60_x.append(x_diff)
+            # # diff diff feature
+            # x_diff = origin_x[:, 1:] - origin_x[:, :-1]
+            # x_diff_diff = x_diff[:, 1:] - x_diff[:, :-1]  # (batch, 58)
+            # x_diff_diff = torch.cat([origin_x.new_zeros(origin_x.size(0), 2), x_diff_diff], dim=1)  # (batch, 60)
+            # x_diff_diff = self.feature_scale[scale_ix](x_diff_diff)  # (batch, 60)
+            # scale_ix += 1
+            # x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
+            # dim60_x.append(x_diff_diff)
 
-        x = torch.cat(dim60_x, dim=2)  # (batch, 60, M)
+        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.num_seq_features)
         position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
         position = self.positional_encoding(position)  # (batch, 60, 128)
         x = self.input_linear(x)  # (batch, seq_len, 128)
@@ -148,10 +147,10 @@ class pao_model(modulus.Module):
 
         # seq_head
         seq_output = self.seq_output_mlp(x)  # (batch, seq_len * 2, n_targets)
-        seq_diff_output = seq_output[:, :, self.num_seq_targets:]
-        seq_output = seq_output[:, :, :self.num_seq_targets]
+        # seq_diff_output = seq_output[:, :, self.num_seq_targets:]
+        # seq_output = seq_output[:, :, :self.num_seq_targets]
         # scalar_head
         scalar_x = x.reshape(x.size(0), -1)
         scalar_x = self.scalar_layer_norm(scalar_x)
         scalar_output = self.scalar_output_mlp(scalar_x)
-        return seq_output, scalar_output, seq_diff_output
+        return seq_output, scalar_output
