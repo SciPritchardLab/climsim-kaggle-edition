@@ -48,7 +48,7 @@ class pao_model(modulus.Module):
         self.positional_encoding = nn.Embedding(60, 128)
         self.input_linear = nn.Linear((self.num_seq_inputs+3) * 3 * 1, 128)  # current, diff
         self.other_feats_mlp = nn.Sequential(
-            nn.Linear(self.num_seq_groups, self.num_hidden),
+            nn.Linear(self.num_scalar_inputs, self.num_hidden),
             nn.BatchNorm1d(self.num_hidden),
             # nn.ReLU(),
             nn.GELU(),
@@ -129,7 +129,7 @@ class pao_model(modulus.Module):
         x = self.input_linear(x)  # (batch, seq_len, 128)
         x = x + position
         # other cols
-        scalar_x = scalar_features  # (batch, n_feats)
+        scalar_x = scalar_features  # (batch, 19)
         scalar_x = self.other_feats_mlp(scalar_x)  # (batch, hidden)
         scalar_x_list = []
         for i in range(60):
@@ -138,7 +138,7 @@ class pao_model(modulus.Module):
         # repeat to match seq_len
         # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, seq_len, hidden)
         # concat
-        x = torch.cat([x, scaler_x], dim=2)  # (batch, seq_len, hidden*2)
+        x = torch.cat([x, scalar_x], dim=2)  # (batch, 60, hidden*2)
         x = self.seq_layer_norm(x)
 
         x = x.transpose(1, 2)  # (batch, hidden, seq_len)
@@ -152,6 +152,6 @@ class pao_model(modulus.Module):
         seq_output = seq_output[:, :, :self.num_seq_targets]
         # scalar_head
         scalar_x = x.reshape(x.size(0), -1)
-        scalar_x = self.scalar_layer_norm(scaler_x)
-        scalar_output = self.scalar_output_mlp(scaler_x)
+        scalar_x = self.scalar_layer_norm(scalar_x)
+        scalar_output = self.scalar_output_mlp(scalar_x)
         return seq_output, scalar_output, seq_diff_output
