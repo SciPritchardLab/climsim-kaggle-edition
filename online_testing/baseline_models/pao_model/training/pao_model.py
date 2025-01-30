@@ -33,67 +33,69 @@ class pao_model(modulus.Module):
                  num_scalar_inputs: int = 19, # number of input scalars
                  num_seq_targets: int = 5, # number of target sequences
                  num_scalar_targets: int = 8, # number of target scalars
-                 num_hidden: int = 128, # number of hidden units in MLP
+                 num_hidden_seq: int = 128, # number of hidden units in MLP for sequences
+                 num_hidden_scalar: int = 128, # number of hidden units in MLP for scalars
                 ):
         super().__init__(meta = pao_model_metadata())
         self.num_seq_inputs = num_seq_inputs
         self.num_scalar_inputs = num_scalar_inputs
         self.num_seq_targets = num_seq_targets
         self.num_scalar_targets = num_scalar_targets
-        self.num_hidden = num_hidden
+        self.num_hidden_seq = num_hidden_seq
+        self.num_hidden_scalar = num_hidden_scalar
+        self.num_hidden_total = self.num_hidden_seq + self.num_hidden_scalar
         # 60 sequences 1d cnn
         self.feature_scale = nn.ModuleList([
             FeatureScale(60) for _ in range(self.num_seq_inputs)
         ])
-        self.positional_encoding = nn.Embedding(60, self.num_hidden)
-        self.input_linear = nn.Linear(self.num_seq_inputs, self.num_hidden)  # current, diff
+        self.positional_encoding = nn.Embedding(60, self.num_hidden_seq)
+        self.input_linear = nn.Linear(self.num_seq_inputs, self.num_hidden_seq)  # current, diff
         self.other_feats_mlp = nn.Sequential(
-            nn.Linear(self.num_scalar_inputs, self.num_hidden),
-            nn.BatchNorm1d(self.num_hidden),
+            nn.Linear(self.num_scalar_inputs, self.num_hidden_scalar),
+            nn.BatchNorm1d(self.num_hidden_scalar),
             # nn.ReLU(),
             nn.GELU(),
-            nn.Linear(self.num_hidden, self.num_hidden),
-            nn.BatchNorm1d(self.num_hidden),
+            nn.Linear(self.num_hidden_scalar, self.num_hidden_scalar),
+            nn.BatchNorm1d(self.num_hidden_scalar),
             # nn.ReLU(),
             nn.GELU()
         )
-        self.other_feats_proj = nn.ModuleList([nn.Linear(self.num_hidden, self.num_hidden) for _ in range(60)])
+        self.other_feats_proj = nn.ModuleList([nn.Linear(self.num_hidden_scalar, self.num_hidden_scalar) for _ in range(60)])
         # layer norm
-        self.layer_norm_in = self.num_hidden * 2
+        self.layer_norm_in = self.num_hidden_total
         self.seq_layer_norm = nn.LayerNorm(self.layer_norm_in)
         # cnn
-        self.num_cnn_hidden = self.num_hidden * 2
         self.cnn1 = nn.Sequential(
-            ResidualBlock(self.num_cnn_hidden, self.num_cnn_hidden, 5, 1, 2),
-            ResidualBlock(self.num_cnn_hidden, self.num_cnn_hidden, 5, 1, 2),
-            ResidualBlock(self.num_cnn_hidden, self.num_cnn_hidden, 5, 1, 2),
-            ResidualBlock(self.num_cnn_hidden, self.num_cnn_hidden, 5, 1, 2)
+            ResidualBlock(self.num_hidden_total, self.num_hidden_total, 5, 1, 2),
+            ResidualBlock(self.num_hidden_total, self.num_hidden_total, 5, 1, 2),
+            ResidualBlock(self.num_hidden_total, self.num_hidden_total, 5, 1, 2),
+            ResidualBlock(self.num_hidden_total, self.num_hidden_total, 5, 1, 2)
         )
         # lstm
         self.lstm = nn.Sequential(
-            nn.LSTM(self.num_cnn_hidden, self.num_cnn_hidden, 2, batch_first=True, bidirectional=True, dropout=0.0),
+            nn.LSTM(self.num_hidden_total, self.num_hidden_total, 2, batch_first=True, bidirectional=True, dropout=0.0),
         )
         # output layer
-        self.output_seq_mlp_input_dim = self.num_cnn_hidden*2
+        self.output_seq_mlp_input_dim = self.num_hidden_total
         self.seq_output_mlp = nn.Sequential(
-            nn.Linear(self.output_seq_mlp_input_dim, self.num_hidden*2),
+            nn.Linear(self.output_seq_mlp_input_dim, self.num_hidden_total),
             nn.GELU(),
-            nn.Linear(self.num_hidden*2, self.num_hidden*2),
+            nn.Linear(self.num_hidden_total, self.num_hidden_total),
             nn.GELU(),
-            nn.Linear(self.num_hidden*2, self.num_hidden),
+            nn.Linear(self.num_hidden_total, self.num_hidden_seq),
             nn.GELU(),
-            nn.Linear(self.num_hidden, self.num_seq_targets)
+            nn.Linear(self.num_hidden_seq, self.num_seq_targets)
         )
-        self.output_scalar_mlp_input_dim = self.num_cnn_hidden * 60
+        self.output_scalar_mlp_input_dim = self.num_hidden_total * 60
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
         self.scalar_output_mlp = nn.Sequential(
-            nn.Linear(self.output_scalar_mlp_input_dim, self.num_hidden),
+            nn.Linear(self.output_scalar_mlp_input_dim, self.num_hidden_scalar),
             # nn.ReLU(),
             nn.GELU(),
-            nn.Linear(self.num_hidden, self.num_hidden),
+            nn.Linear(self.num_hidden_scalar, self.num_hidden_scalar),
             # nn.ReLU(),
             nn.GELU(),
-            nn.Linear(self.num_hidden, self.num_scalar_targets)
+            nn.Linear(self.num_hidden_scalar, self.num_scalar_targets)
         )
 
     def forward(self, seq_features, scalar_features):
@@ -145,7 +147,7 @@ class pao_model(modulus.Module):
         x = x.transpose(1, 2)
         x, _ = self.lstm(x)  # (batch, seq_len, hidden)
 
-        seq_output = self.seq_output_mlp(x)  # (batch, seq_len * 2, n_targets)
+        seq_output = self.seq_output_mlp(x)  # (batch, seq_len, n_targets)
         # seq_diff_output = seq_output[:, :, self.num_seq_targets:]
         # seq_output = seq_output[:, :, :self.num_seq_targets]
         x = x.reshape(x.size(0), -1)
