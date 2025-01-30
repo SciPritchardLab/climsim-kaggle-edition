@@ -1,52 +1,101 @@
-[![Dataset: E3SM-MMF High-Resolution Real Geography](https://img.shields.io/badge/Dataset-%20High%20Resolution%20Real%20Geography-yellow?logo=🤗&style=flat-square)](https://huggingface.co/datasets/LEAP/ClimSim_high-res)
-[![Dataset: E3SM-MMF Low-Resolution Real Geography](https://img.shields.io/badge/Dataset-%20Low%20Resolution%20Real%20Geography-yellow?logo=🤗&style=flat-square)](https://huggingface.co/datasets/LEAP/ClimSim_low-res)
-[![Dataset: E3SM-MMF Low-Resolution Aquaplanet](https://img.shields.io/badge/Dataset-%20Low%20Resolution%20Aquaplanet-yellow?logo=🤗&style=flat-square)](https://huggingface.co/datasets/LEAP/ClimSim_low-res_aqua-planet)
+# Hybrid E3SM-MMF-NN-Emulator Simulation and Online Evaluation
 
-# ClimSim: An open large-scale dataset for training high-resolution physics emulators in hybrid multi-scale climate simulators
+## Table of Contents
 
-ClimSim is the largest-ever dataset designed for hybrid ML-physics research. It comprises multi-scale climate simulations, developed by a consortium of climate scientists and ML researchers. It consists of 5.7 billion pairs of multivariate input and output vectors that isolate the influence of locally-nested, high-resolution, high-fidelity physics on a host climate simulator’s macro-scale physical state.
-The dataset is global in coverage, spans multiple years at high sampling frequency, and is designed such that resulting emulators are compatible with downstream coupling into operational climate simulators. 
-We implement a range of deterministic and stochastic regression baselines to highlight the ML challenges and their scoring. 
+1. [Problem overview](#1-problem-overview)
+2. [Data preparation](#2-data-preparation)
+    1. [Data download](#21-data-download)
+    2. [Combine raw data into a few single files](#22-combine-raw-data-into-a-few-single-files)
+3. [Model training](#3-model-training)
+    1. [General requirement](#31-general-requirement)
+    2. [Training scripts of our baseline online models](#32-training-scripts-of-our-baseline-online-models)
+4. [Model post-processing: create wrapper for the trained model to include any normalization and de-normalization](#4-model-post-processing-create-wrapper-for-the-trained-model-to-include-any-normalization-and-de-normalization)
+5. [Run hybrid E3SM MMF-NN-Emulator simulation](#5-run-hybrid-e3sm-mmf-nn-emulator-simulation)
+6. [Evaluation of hybrid simulation](#6-evaluation-of-hybrid-simulation)
 
-![fig_1](figures/fig_1.png)
+## 1. Problem overview
+The ultimate goal of training a ML model emulator (of the cloud-resolving model embedded in the E3SM-MMF climate simulator) using the ClimSim dataset is to couple it to the host E3SM climate simulator and evaluate the performance of such hybrid ML-physics simulation, e.g., whether the hybrid simulation can reproduce the statistics of the pure physics simulation. Here we use "online" to denote this task of performing and evaluating hybrid simulation, in contrast to the "offline" task in which we focus on training a ML model. Here we describe the entire workflow of training these baseline models, running and evaluating the hybrid simulation. We provided a few baseline models that we trained and optimized on the online task. These pretrained models include the MLP models and U-Net models from [Stable Machine-Learning Parameterization](https://arxiv.org/abs/2407.00124) paper.
 
-## Getting Started
+Refer to the [ClimSim-Online paper](https://arxiv.org/abs/2306.08754) for more details on the online task overview and the [Stable Machine-Learning Parameterization](https://arxiv.org/abs/2407.00124) paper for more details on the example baseline models we provide.
 
-* [Quickstart](https://leap-stc.github.io/ClimSim/quickstart.html)
-* [Dataset Information](https://leap-stc.github.io/ClimSim/dataset.html)
-* [Code Installation](https://leap-stc.github.io/ClimSim/installation.html)
+---
 
-## Models and Evaluation
+## 2. Data preparation
 
-* [Baseline Models](https://leap-stc.github.io/ClimSim/models.html)
-* [Evaluation](https://leap-stc.github.io/ClimSim/evaluating.html)
+### 2.1 Data download
 
-## Demo Notebooks
+We take the low-resolution dataset as example. Dowload either the [Low-Resolution Real Geography](https://huggingface.co/datasets/LEAP/ClimSim_low-res) or [Low-Resolution Real Geography Expanded](https://huggingface.co/datasets/LEAP/ClimSim_low-res-expanded) dataset from Hugging Face. The expanded version includes additional input features such as large-scale forcings and convection memory (previous steps state tendencies) that we used in our pretrained U-Net models (refer to [this paper](https://arxiv.org/abs/2407.00124) for more details). 
 
-* [Multi-Layer Perceptron (MLP) Example](https://leap-stc.github.io/ClimSim/demo_notebooks/mlp_example.html)
-* [Convolutional Neural Network (CNN) Example](https://leap-stc.github.io/ClimSim/demo_notebooks/cnn_example.html)
-* [Water Conservation Example](https://leap-stc.github.io/ClimSim/demo_notebooks/water_conservation.html)
+Please don't use the current preprocessed [Subsampled Low-Resolution Data](https://huggingface.co/datasets/LEAP/subsampled_low_res) which does not include cloud and wind tendencies in target variables. For online testing, we need the ML model to predict not only temperature and moisture tendencies but also these cloud and wind tendencies.
 
-## Online Testing
+If you would like to work on the [High-Resolution Dataset]((https://huggingface.co/datasets/LEAP/ClimSim_high-res)) and also want to expand the input feature, you can follow [this notebook](./online_testing/data_preparation/adding_input_feature.ipynb) which illustrates how we created the expanded input features from the original low-resolution dataset.
 
-* [Online Testing](./online_testing/README.md)
+### 2.2 Combine raw data into a few single files
 
-## Project Structure
+The raw data contains a large number of individual data files outputted at each E3SM model time step. We need to aggregate these individual files into a few files containing data array for efficient training.
 
-[![Code Repository](https://img.shields.io/badge/-Code%20Repository-181717?logo=github&style=for-the-badge)](https://github.com/leap-stc/ClimSim/tree/main)
+Take our MLP baseline model (from the [Stable Machine-Learning Parameterization](https://arxiv.org/abs/2407.00124) paper) for example. Run the [create_dataset_example_v2rh.ipynb](./data_preparation/create_dataset/create_dataset_example_v2rh.ipynb) notebook to prepare the input/output files for the MLP_v2rh model. 
 
-* [GitHub Repository Structure](./ARCHITECTURE.md)
+If you want to reproduce the U-Net models from [Stable Machine-Learning Parameterization](https://arxiv.org/abs/2407.00124) paper, run the [create_dataset_example_v4.ipynb](./data_preparation/create_dataset/create_dataset_example_v4.ipynb) notebook to prepare the input/output files for the Unet_v4 model. Or run the [create_dataset_example_v5.ipynb](./data_preparation/create_dataset/create_dataset_example_v5.ipynb) notebook to prepare the input/output files for the Unet_v5 model. 'v4' is the unconstrained U-Net, while 'v5' is the constrained U-Net, please refer to original paper for more details.
 
+---
+
+## 3. Model training
+
+### 3.1 General requirement
+
+To be able to couple your trained NN model to E3SM seeminglessly, you need to be aware of the following requirements before training your NN model:
+
+- Your NN model must be saved in TorchScript format. Converting a pytorch model into TorchScript is straightforward. Our training scripts include the code to save the model in TorchScript format. You can also refer to the [Official Torchscript Documentation](https://pytorch.org/docs/stable/jit.html) for more details.
+- Your NN model's forward method should take an input tensor with shape (batch_size, num_input_features) and return an output tensor with shape (batch_size, num_output_features). The output feature dimension should have a length of ```num_output_features = 368``` and contain the following variables in the same order as: ```'ptend_t', 'ptend_q0001', 'ptend_q0002', 'ptend_q0003', 'ptend_u', 'ptend_v', 'cam_out_NETSW', 'cam_out_FLWDS', 'cam_out_PRECSC', 'cam_out_PRECC', 'cam_out_SOLS', 'cam_out_SOLL', 'cam_out_SOLSD', 'cam_out_SOLLD'```. The ptend variables are vertical profiles of tendencies of atmospheric states and have a length of 60.
+
+### 3.2 Training scripts of our baseline online models
+
+We provide the training scripts under the ```online_testing/baseline_models/``` directory. Under the folder of each baseline model, we provide the slurm scripts under the ```slurm``` folder to run the training job.
+
+For example, to train the MLP model (with a huber loss and a 'step' lr scheduler), you can run the following command:
+```bash
+cd online_testing/baseline_models/MLP_v2rh/training/slurm/
+sbatch v2rh_mlp_nonaggressive_cliprh_huber_step_3l_lr1em3.sbatch
+```
+
+The training will read in the default configuration arguments listed in ```training/conf/config_single.yaml```. You need to change a few path argument in the config_single.yaml to the paths on your machine, or you can also overwrite those paths in the slurm job scripts. By default, the training slurm scripts requested to use 4 GPUs. You can change the number of GPUs in the slurm scripts.
+
+The training requires to use the [modulus library](https://docs.nvidia.com/deeplearning/modulus/getting-started/index.html). We used the modulus container image for the training environment. You could download the latest version by following the instructions on [modulus website](https://docs.nvidia.com/deeplearning/modulus/getting-started/index.html). For reproducibility information, we used version ```nvcr.io/nvidia/modulus/modulus:24.01```. If you don't want to use a container, you could also use
+
+```bash
+pip install nvidia-modulus
+``` 
+to install on any system but we recommend the container for best results.
+
+---
+
+## 4 Model post-processing: create wrapper for the trained model to include any normalization and de-normalization
+
+The E3SM MMF-NN-Emulator code expects the NN model to take un-normalized input features and output un-normalized output features. Notebooks provided in ```./model_postprocessing``` directory show how to create a wrapper for our pretrained MLP and U-Net models to include pre/post-processing such as normalization and de-normalization inside the forward method of the TorchScript model. 
+
+For example, the [v5_nn_wrapper.ipynb](./model_postprocessing/v5_nn_wrapper.ipynb) notebook shows how to create a wrapper for the U-Net model to read raw input features, calculate additional needed input features, normalize the input, clip input values, pass them to the U-Net model, de-normalize the output features, and apply the temperature-based liquid-ice cloud partitioning.
+
+---
+
+## 5. Run hybrid E3SM MMF-NN-Emulator simulations
+
+Please follow the instructions in the [ClimSim-Online repository](https://github.com/leap-stc/climsim-online/tree/main) to set up the container environment and run the hybrid simulation.
+
+Please check the [NVlabs/E3SM MMF-NN-Emulator repository](https://github.com/zyhu-hu/E3SM_nvlab/tree/cleaner_workflow_tomerge/climsim_scripts) to learn about the configurations and namelist variables of the E3SM MMF-NN-Emulator version.
+
+---
+
+## 6. Evaluation of hybrid simulations
+
+The notebooks in the ```./evaluation``` directory show how to reproduce the plots in the [Stable Machine-Learning Parameterization](https://arxiv.org/abs/2407.00124) paper. Data required by these evaluation/visualization notebooks can be downloaded at [Stable Machine-Learning Parameterization: Zenodo Data](https://zenodo.org/records/12797811).
+
+---
+
+## Author
+- Zeyuan Hu, Harvard University
 
 ## References
 
-* [ClimSim paper](https://arxiv.org/abs/2306.08754)
-* [Recorded NeurIPS 2023 talk](https://www.youtube.com/watch?v=Wa1HXB_chYg)
-[![YouTube video](https://img.youtube.com/vi/Wa1HXB_chYg/0.jpg)](https://www.youtube.com/watch?v=Wa1HXB_chYg)
-
-* [Contributor Guide](https://leap-stc.github.io/ClimSim/CONTRIBUTING.html)
-
-
-## Legal
-
-ClimSim uses the Apache 2.0 license for code found on the associated GitHub repo and the Creative Commons Attribution 4.0 license for data hosted on HuggingFace. The [LICENSE file](https://github.com/leap-stc/ClimSim/blob/main/LICENSE) for the repo can be found in the top-level directory.
+- [ClimSim-Online: A Large Multi-scale Dataset and Framework for Hybrid ML-physics Climate Emulation](https://arxiv.org/abs/2306.08754)
+- [Stable Machine-Learning Parameterization of Subgrid Processes with Real Geography and Full-physics Emulation](https://arxiv.org/abs/2407.00124)
