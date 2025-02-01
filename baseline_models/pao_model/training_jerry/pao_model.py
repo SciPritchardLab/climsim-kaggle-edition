@@ -155,3 +155,10 @@ class pao_model(modulus.Module):
         scalar_output = self.scalar_output_mlp(x)
 
         return seq_output, scalar_output
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+if __name__ == '__main__':
+    model = pao_model()
+    print(count_parameters(model))
