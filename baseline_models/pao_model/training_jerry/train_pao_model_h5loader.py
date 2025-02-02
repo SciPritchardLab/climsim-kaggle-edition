@@ -30,63 +30,6 @@ import gc
 from soap import SOAP
 from torch.nn.utils import clip_grad_norm_
 
-def train_one_epoch(model, loss_fn, data_loader, optimizer,
-                    device, scheduler, epoch, scaler=None, awp=None, ema=None):
-    # get batch data loop
-    epoch_loss = 0
-    epoch_data_num = len(data_loader.dataset)
-
-    model.train()
-
-    bar = tqdm(enumerate(data_loader), total=len(data_loader))
-
-    scaler_weight_arr = np.asarray([new_weight[c] for c in TARGET_SCALER_COLS])
-    seq_weight_arr = np.asarray([[new_weight[f"{c}_{i}"] for c in TARGET_SEQ_GROUPS] for i in range(60)])
-    scaler_weight_mask = np.where(scaler_weight_arr == 0, 0, 1)
-    seq_weight_mask = np.where(seq_weight_arr == 0, 0, 1)
-    seq_weight_mask[12:27, TARGET_SEQ_GROUPS.index("ptend_q0002")] = 0.0
-    scaler_weight_mask = torch.tensor(scaler_weight_mask, dtype=torch.float).to(device)
-    seq_weight_mask = torch.tensor(seq_weight_mask, dtype=torch.float).to(device)
-
-    for iter_i, batch in bar:
-        # input
-        seq_features = batch["seq_features"].to(device)
-        scaler_features = batch["scaler_features"].to(device)
-        seq_targets = batch["seq_targets"].to(device)
-        scaler_targets = batch["scaler_targets"].to(device)
-        seq_targets_diff = batch["seq_targets_diff"].to(device)
-        batch_size = len(scaler_targets)
-
-        # zero grad
-        optimizer.zero_grad()
-
-        with torch.set_grad_enabled(True):
-            with amp.autocast(enabled=CFG.use_fp16):
-                seq_preds, scaler_preds, seq_diff_preds = model(scaler_features, seq_features)
-                # mask
-                seq_preds = seq_preds * seq_weight_mask
-                scaler_preds = scaler_preds * scaler_weight_mask
-                seq_diff_preds = seq_diff_preds * seq_weight_mask
-                scaler_targets = scaler_targets * scaler_weight_mask
-                seq_targets = seq_targets * seq_weight_mask
-                seq_targets_diff = seq_targets_diff * seq_weight_mask
-                # loss function
-                seq_loss = loss_fn(seq_preds.reshape(-1), seq_targets.reshape(-1))
-                scaler_loss = loss_fn(scaler_preds.reshape(-1), scaler_targets.reshape(-1))
-                seq_diff_loss = loss_fn(seq_diff_preds.reshape(-1), seq_targets_diff.reshape(-1))
-                loss = seq_loss + scaler_loss + seq_diff_loss
-            scalar.scale(loss).backward()
-            scalar.step(optimizer)
-            scalar.update()
-            scheduler.step()
-            ema.update(model)
-            epoch_loss += loss.item()
-        
-        bar.set_postfix(OrderedDict(loss=loss.item(), lr=optimizer.param_groups[0]['lr']))
-    
-    epoch_loss_per_data = epoch_loss / epoch_data_num
-    return epoch_loss_per_data
-
 # config_name gets overwritten in the SLURM script
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -195,11 +138,14 @@ def main(cfg: DictConfig) -> float:
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
-    model = resLSTM(
-        inputs_dim = 42,
-        num_lstm = 10,
-        hidden_state = 512,
-    ).to(dist.device)
+    model = pao_model(
+            num_seq_inputs = cfg.num_seq_inputs,
+            num_scalar_inputs = cfg.num_scalar_inputs,
+            num_seq_targets = cfg.num_seq_targets,
+            num_scalar_targets = cfg.num_scalar_targets,
+            num_hidden_seq = cfg.num_hidden_seq,
+            num_hidden_scalar = cfg.num_hidden_scalar,
+            ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
         print("Restarting from checkpoint: " + cfg.restart_path)
@@ -261,7 +207,7 @@ def main(cfg: DictConfig) -> float:
     # create loss function
     criterion = None
     if cfg.loss == 'mse':
-        loss_fn = mse
+        loss_fn = nn.MSELoss()
         criterion = nn.MSELoss()
     elif cfg.loss == 'mae':
         loss_fn = nn.L1Loss()
@@ -273,20 +219,6 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Loss function not implemented')
     mse_criterion = nn.MSELoss()
     mae_criterion = nn.L1Loss()
-    def consistency_loss(pred, target):
-
-        # pred should be of shape (batch_size, 368)
-        # target should be of shape (batch_size, 368)
-        # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
-        def vert_diff(col):
-            return col[:,1:60] - col[:,0:59]
-        custom_loss = criterion(pred, target)
-        custom_loss += criterion(vert_diff(pred[:,0:60]), vert_diff(target[:,0:60]))
-        custom_loss += criterion(vert_diff(pred[:,60:120]), vert_diff(target[:,60:120]))
-        custom_loss += criterion(vert_diff(pred[:,120:180]), vert_diff(target[:,120:180]))
-        custom_loss += criterion(vert_diff(pred[:,180:240]), vert_diff(target[:,180:240]))
-        custom_loss += criterion(vert_diff(pred[:,240:300]), vert_diff(target[:,240:300]))
-        return custom_loss
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
@@ -359,7 +291,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
                 optimizer.zero_grad()
                 output = model(data_input)
-                loss = consistency_loss(output, target)
+                loss = criterion(output, target)
                 loss.backward()
 
                 if cfg.clip_grad:

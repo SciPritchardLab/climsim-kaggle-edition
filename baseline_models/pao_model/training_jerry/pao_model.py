@@ -97,6 +97,9 @@ class pao_model(modulus.Module):
             nn.GELU(),
             nn.Linear(self.num_hidden_scalar, self.num_scalar_targets)
         )
+    
+    def count_trainable_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def forward(self, seq_features, scalar_features):
         # concat dim60 cols
@@ -156,9 +159,6 @@ class pao_model(modulus.Module):
 
         return seq_output, scalar_output
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
 if __name__ == '__main__':
     model = pao_model()
-    print(count_parameters(model))
+    print(model.count_trainable_parameters())

@@ -678,13 +678,14 @@ class data_utils:
         This function sets the inputs and outputs to the V6 subset.
         It also indicates the index of the surface pressure variable.
         '''
-        self.input_vars = self.v5_inputs
-        self.target_vars = self.v5_outputs
+        self.input_vars = self.v6_inputs
+        self.target_vars = self.v6_outputs
         self.ps_index = 1380
         self.input_feature_len = 1399
         self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True
+        self.full_vars_v6 = True
 
     def get_xrdata(self, file, file_vars = None):
         '''

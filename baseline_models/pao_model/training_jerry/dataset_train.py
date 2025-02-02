@@ -139,14 +139,6 @@ class dataset_train(Dataset):
         input_file = self.input_files[self.input_paths[file_idx]]
         target_file = self.target_files[self.target_paths[file_idx]]
         x = input_file['data'][local_idx]
-        # start of hacky part for 'v6' data
-        mask = np.ones(1405, dtype = bool)
-        indices_to_exclude = [-1, -4, -5, -6, -7, -8]
-        # exclude  tm_state_ps, tm_pbuf_SOLIN, tm_pbuf_SHFLX, tm_pbuf_LHFLX, tm_pbuf_COSZRS, icol
-        # these variables are not supported in the current E3SM implementation
-        mask[indices_to_exclude] = False
-        x = x[mask]
-        # end of hacky part for 'v6' data
         y = target_file['data'][local_idx]
         if self.qn_tscaled:
             # use temperature to generate weights for scaling qn
@@ -225,6 +217,6 @@ class dataset_train(Dataset):
         x_seq_single = x[input_series_num*60:] # (19)
 
         if self.qn_tscaled:
-            return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
+            return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
         else:
             return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
