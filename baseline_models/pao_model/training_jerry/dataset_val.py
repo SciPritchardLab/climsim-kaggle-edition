@@ -100,13 +100,6 @@ class dataset_val(Dataset):
 
         if not self.qn_logtransform:
             x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
-        
-        # start of hacky part for 'v6' data
-        mask = np.ones(1405, dtype = bool)
-        indices_to_exclude = [-1, -4, -5, -6, -7, -8]
-        mask[indices_to_exclude] = False
-        x = (x[mask] - self.input_sub) / self.input_div
-        # end of hacky part for 'v6' data
 
         x[np.isnan(x)] = 0
         x[np.isinf(x)] = 0
@@ -172,6 +165,6 @@ class dataset_val(Dataset):
         x_seq_single = x[input_series_num*60:] # (19)
 
         if self.qn_tscaled:
-            return torch.tensor(x_seq, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
+            return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
         else:
             return torch.tensor(x_seq_series, dtype=torch.float32), torch.tensor(x_seq_single, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)

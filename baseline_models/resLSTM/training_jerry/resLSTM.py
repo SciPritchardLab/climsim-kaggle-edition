@@ -29,6 +29,7 @@ class resLSTM(modulus.Module):
             inputs_dim: int = 42, # number of sequences
             num_lstm: int = 10,
             hidden_state: int = 512,
+            strato_lev_out=12,
             ):
         
         super().__init__(meta=resLSTM_metadata())
@@ -36,6 +37,7 @@ class resLSTM(modulus.Module):
         self.num_lstm = num_lstm
         self.hidden_state = hidden_state
         self.output_single_num = 8
+        self.strato_lev_out = strato_lev_out
 
         residual_layers = nn.ModuleList()
         lstm_layers = nn.ModuleDict()
@@ -95,4 +97,11 @@ class resLSTM(modulus.Module):
         single_part = torch.mean(single_part, dim=1) # b,8
 
         outputs = torch.concat([series_part, single_part], dim=1)
+
+        if self.output_prune:
+            outputs = outputs.clone()
+            outputs[:, 60:60+self.strato_lev_out] = y[:, 60:60+self.strato_lev_out].clone().zero_()
+            outputs[:, 120:120+self.strato_lev_out] = y[:, 120:120+self.strato_lev_out].clone().zero_()
+            outputs[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
+            outputs[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
         return outputs

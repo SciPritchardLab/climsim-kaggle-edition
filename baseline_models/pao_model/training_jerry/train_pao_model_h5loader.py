@@ -3,10 +3,11 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
+
+
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
@@ -17,75 +18,16 @@ from modulus.launch.logging import (
     initialize_mlflow,
 )
 from climsim_utils.data_utils import *
-from dataset_val import dataset_val
 from dataset_train import dataset_train
-import transformers
+from dataset_val import dataset_val
+from pao_model import pao_model
 
 import hydra
-from collections.abc import Iterable
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
 from soap import SOAP
-from torch.nn.utils import clip_grad_norm_
-
-def train_one_epoch(model, loss_fn, data_loader, optimizer,
-                    device, scheduler, epoch, scaler=None, awp=None, ema=None):
-    # get batch data loop
-    epoch_loss = 0
-    epoch_data_num = len(data_loader.dataset)
-
-    model.train()
-
-    bar = tqdm(enumerate(data_loader), total=len(data_loader))
-
-    scaler_weight_arr = np.asarray([new_weight[c] for c in TARGET_SCALER_COLS])
-    seq_weight_arr = np.asarray([[new_weight[f"{c}_{i}"] for c in TARGET_SEQ_GROUPS] for i in range(60)])
-    scaler_weight_mask = np.where(scaler_weight_arr == 0, 0, 1)
-    seq_weight_mask = np.where(seq_weight_arr == 0, 0, 1)
-    seq_weight_mask[12:27, TARGET_SEQ_GROUPS.index("ptend_q0002")] = 0.0
-    scaler_weight_mask = torch.tensor(scaler_weight_mask, dtype=torch.float).to(device)
-    seq_weight_mask = torch.tensor(seq_weight_mask, dtype=torch.float).to(device)
-
-    for iter_i, batch in bar:
-        # input
-        seq_features = batch["seq_features"].to(device)
-        scaler_features = batch["scaler_features"].to(device)
-        seq_targets = batch["seq_targets"].to(device)
-        scaler_targets = batch["scaler_targets"].to(device)
-        seq_targets_diff = batch["seq_targets_diff"].to(device)
-        batch_size = len(scaler_targets)
-
-        # zero grad
-        optimizer.zero_grad()
-
-        with torch.set_grad_enabled(True):
-            with amp.autocast(enabled=CFG.use_fp16):
-                seq_preds, scaler_preds, seq_diff_preds = model(scaler_features, seq_features)
-                # mask
-                seq_preds = seq_preds * seq_weight_mask
-                scaler_preds = scaler_preds * scaler_weight_mask
-                seq_diff_preds = seq_diff_preds * seq_weight_mask
-                scaler_targets = scaler_targets * scaler_weight_mask
-                seq_targets = seq_targets * seq_weight_mask
-                seq_targets_diff = seq_targets_diff * seq_weight_mask
-                # loss function
-                seq_loss = loss_fn(seq_preds.reshape(-1), seq_targets.reshape(-1))
-                scaler_loss = loss_fn(scaler_preds.reshape(-1), scaler_targets.reshape(-1))
-                seq_diff_loss = loss_fn(seq_diff_preds.reshape(-1), seq_targets_diff.reshape(-1))
-                loss = seq_loss + scaler_loss + seq_diff_loss
-            scalar.scale(loss).backward()
-            scalar.step(optimizer)
-            scalar.update()
-            scheduler.step()
-            ema.update(model)
-            epoch_loss += loss.item()
-        
-        bar.set_postfix(OrderedDict(loss=loss.item(), lr=optimizer.param_groups[0]['lr']))
-    
-    epoch_loss_per_data = epoch_loss / epoch_data_num
-    return epoch_loss_per_data
 
 # config_name gets overwritten in the SLURM script
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
@@ -140,32 +82,6 @@ def main(cfg: DictConfig) -> float:
     if not os.path.exists(cfg.val_input):
         raise ValueError('Validation input path does not exist')
 
-    val_dataset = dataset_val(input_paths = val_input_path, 
-                                  target_paths = val_target_path, 
-                                  input_sub = input_sub, 
-                                  input_div = input_div, 
-                                  out_scale = out_scale, 
-                                  qinput_prune = cfg.qinput_prune, 
-                                  output_prune = cfg.output_prune, 
-                                  strato_lev = cfg.strato_lev, 
-                                  strato_lev_out = cfg.strato_lev_out, 
-                                  qn_lbd = lbd_qn, 
-                                  decouple_cloud = cfg.decouple_cloud, 
-                                  aggressive_pruning = cfg.aggressive_pruning, 
-                                  strato_lev_qinput = cfg.strato_lev_qinput, 
-                                  strato_lev_tinput = cfg.strato_lev_tinput, 
-                                  input_clip = cfg.input_clip, 
-                                  input_clip_rhonly = cfg.input_clip_rhonly)
-
-    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
-    val_loader = DataLoader(val_dataset, 
-                            batch_size=cfg.batch_size, 
-                            shuffle=False,
-                            pin_memory=True,
-                            drop_last=False,
-                            sampler=val_sampler,
-                            num_workers=cfg.num_workers)
-    
     train_dataset = dataset_train(parent_path = cfg.data_path, 
                                     input_sub = input_sub, 
                                     input_div = input_div, 
@@ -191,15 +107,44 @@ def main(cfg: DictConfig) -> float:
                                 pin_memory=True,
                                 drop_last=True,
                                 num_workers=cfg.num_workers)
+
+    val_dataset = dataset_val(input_paths = val_input_path, 
+                                  target_paths = val_target_path, 
+                                  input_sub = input_sub, 
+                                  input_div = input_div, 
+                                  out_scale = out_scale, 
+                                  qinput_prune = cfg.qinput_prune, 
+                                  output_prune = cfg.output_prune, 
+                                  strato_lev = cfg.strato_lev, 
+                                  strato_lev_out = cfg.strato_lev_out, 
+                                  qn_lbd = lbd_qn, 
+                                  decouple_cloud = cfg.decouple_cloud, 
+                                  aggressive_pruning = cfg.aggressive_pruning, 
+                                  strato_lev_qinput = cfg.strato_lev_qinput, 
+                                  strato_lev_tinput = cfg.strato_lev_tinput, 
+                                  input_clip = cfg.input_clip, 
+                                  input_clip_rhonly = cfg.input_clip_rhonly)
+
+    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
+    val_loader = DataLoader(val_dataset, 
+                            batch_size=cfg.batch_size, 
+                            shuffle=False,
+                            pin_memory=True,
+                            drop_last=False,
+                            sampler=val_sampler,
+                            num_workers=cfg.num_workers)
                               
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
-    model = resLSTM(
-        inputs_dim = 42,
-        num_lstm = 10,
-        hidden_state = 512,
-    ).to(dist.device)
+    model = pao_model(
+            num_seq_inputs = cfg.num_seq_inputs,
+            num_scalar_inputs = cfg.num_scalar_inputs,
+            num_seq_targets = cfg.num_seq_targets,
+            num_scalar_targets = cfg.num_scalar_targets,
+            num_hidden_seq = cfg.num_hidden_seq,
+            num_hidden_scalar = cfg.num_hidden_scalar,
+            ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
         print("Restarting from checkpoint: " + cfg.restart_path)
@@ -253,43 +198,58 @@ def main(cfg: DictConfig) -> float:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg.scheduler.plateau.factor, patience=cfg.scheduler.plateau.patience, verbose=True)
     elif cfg.scheduler_name == 'cosine':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.scheduler.cosine.T_max, eta_min=cfg.scheduler.cosine.eta_min)
-    elif cfg.scheduler_name == 'cosine_warmup':
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=cfg.scheduler.cosine_warmup.T_0, T_mult=cfg.scheduler.cosine_warmup.T_mult, eta_min=cfg.scheduler.cosine_warmup.eta_min)
     if scheduler is None:
         raise ValueError('Scheduler not implemented')
     
     # create loss function
     criterion = None
     if cfg.loss == 'mse':
-        loss_fn = mse
         criterion = nn.MSELoss()
     elif cfg.loss == 'mae':
-        loss_fn = nn.L1Loss()
         criterion = nn.L1Loss()
     elif cfg.loss == 'smoothL1':
-        loss_fn = nn.SmoothL1Loss()
         criterion = nn.SmoothL1Loss()
     if criterion is None:
         raise ValueError('Loss function not implemented')
     mse_criterion = nn.MSELoss()
     mae_criterion = nn.L1Loss()
-    def consistency_loss(pred, target):
+
+    def loss_weighted(pred, target):
+        if cfg.variable_subsets in ['v1','v1_dyn']:
+            raise ValueError('Weighted loss not implemented for v1/v1_dyn')
+        # dt_weight = 1.0
+        # dq1_weight = 1.0
+        # dq2_weight = 1.0
+        # dq3_weight = 1.0
+        # du_weight = 1.0
+        # dv_weight = 1.0
+        # d2d_weight = 1.0
 
         # pred should be of shape (batch_size, 368)
         # target should be of shape (batch_size, 368)
         # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
-        def vert_diff(col):
-            return col[:,1:60] - col[:,0:59]
-        custom_loss = criterion(pred, target)
-        custom_loss += criterion(vert_diff(pred[:,0:60]), vert_diff(target[:,0:60]))
-        custom_loss += criterion(vert_diff(pred[:,60:120]), vert_diff(target[:,60:120]))
-        custom_loss += criterion(vert_diff(pred[:,120:180]), vert_diff(target[:,120:180]))
-        custom_loss += criterion(vert_diff(pred[:,180:240]), vert_diff(target[:,180:240]))
-        custom_loss += criterion(vert_diff(pred[:,240:300]), vert_diff(target[:,240:300]))
-        return custom_loss
+        #only do the calculation if any of the weights are not 1.0
+        if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
+            return criterion(pred, target)
+        pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
+        pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
+        pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
+        pred[:,180:240] = pred[:,180:240] * cfg.dq3_weight
+        pred[:,240:300] = pred[:,240:300] * cfg.du_weight
+        pred[:,300:360] = pred[:,300:360] * cfg.dv_weight
+        pred[:,360:368] = pred[:,360:368] * cfg.d2d_weight
+        target[:,0:60] = target[:,0:60] * cfg.dt_weight
+        target[:,60:120] = target[:,60:120] * cfg.dq1_weight
+        target[:,120:180] = target[:,120:180] * cfg.dq2_weight
+        target[:,180:240] = target[:,180:240] * cfg.dq3_weight
+        target[:,240:300] = target[:,240:300] * cfg.du_weight
+        target[:,300:360] = target[:,300:360] * cfg.dv_weight
+        target[:,360:368] = target[:,360:368] * cfg.d2d_weight
+        return criterion(pred, target)
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
+    logger0 = RankZeroLoggingWrapper(logger, dist)
 
     if cfg.logger == 'wandb':
         # Initialize the MLFlow logger
@@ -313,7 +273,7 @@ def main(cfg: DictConfig) -> float:
         LaunchLogger.initialize(use_mlflow=True)
 
     if cfg.save_top_ckpts<=0:
-        logger.info("Checkpoints should be set > 0, setting to 1")
+        logger0.info("Checkpoints should be set > 0, setting to 1")
         num_top_ckpts = 1
     else:
         num_top_ckpts = cfg.save_top_ckpts
@@ -336,38 +296,44 @@ def main(cfg: DictConfig) -> float:
     if dist.world_size > 1:
         torch.distributed.barrier()
 
+    hyai = data.grid_info['hyai'].values
+    hybi = data.grid_info['hybi'].values
+    hyai = torch.tensor(hyai, dtype = torch.float32).to(device)
+    hybi = torch.tensor(hybi, dtype = torch.float32).to(device)
+
+    input_sub_device = torch.tensor(input_sub, dtype = torch.float32).to(device)
+    input_div_device = torch.tensor(input_div, dtype = torch.float32).to(device)
+    out_scale_device = torch.tensor(out_scale, dtype = torch.float32).to(device)
+
+    @StaticCaptureTraining(
+        model=model,
+        optim=optimizer,
+    )
+    def training_step(model, data_input, target):
+        output = model(data_input)
+        loss = loss_weighted(output, target)
+        return loss
+
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
         return my_model(invar)
     #training block
-    logger.info("Starting Training!")
+    logger0.info("Starting Training!")
     # Basic training block with tqdm for progress tracking
     for epoch in range(cfg.epochs):
         if dist.distributed:
             train_sampler.set_epoch(epoch)
 
         with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=cfg.mini_batch_log_freq) as launchlog:
-            model.train()
-            
-            total_iterations = len(train_loader)
 
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
-            for iteration, (data_input, target) in enumerate(train_loop):
+            for data_input, target in train_loop:
                 if cfg.early_stop_step > 0 and current_step > cfg.early_stop_step:
                     break
                 data_input, target = data_input.to(device), target.to(device)
-                optimizer.zero_grad()
-                output = model(data_input)
-                loss = consistency_loss(output, target)
-                loss.backward()
 
-                if cfg.clip_grad:
-                    clip_grad_norm_(model.parameters(), max_norm=cfg.clip_grad_norm)
-
-                optimizer.step()
-                if cfg.scheduler_name == 'cosine_warmup':
-                    scheduler.step(epoch + iteration / total_iterations)
+                loss = training_step(model, data_input, target)
 
                 launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
                 # Update the progress bar description with the current loss
@@ -375,10 +341,10 @@ def main(cfg: DictConfig) -> float:
                 train_loop.set_postfix(loss=loss.item())
                 current_step += 1
             
-            model.eval()
             val_loss = 0.0
             val_mse = 0.0
             val_mae = 0.0
+
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')
             current_step = 0
@@ -389,7 +355,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 output = eval_step_forward(model, data_input)
-                loss = consistency_loss(output, target)
+                loss = loss_weighted(output, target)
                 mse = mse_criterion(output, target)
                 mae = mae_criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
@@ -411,18 +377,10 @@ def main(cfg: DictConfig) -> float:
                 torch.distributed.all_reduce(current_val_loss_avg)
                 current_val_loss_avg = current_val_loss_avg.item() / dist.world_size
 
-                current_val_mse_avg = torch.tensor(current_val_mse_avg, device=dist.device)
-                torch.distributed.all_reduce(current_val_mse_avg)
-                current_val_mse_avg = current_val_mse_avg.item() / dist.world_size
-
-                current_val_mae_avg = torch.tensor(current_val_mae_avg, device=dist.device)
-                torch.distributed.all_reduce(current_val_mae_avg)
-                current_val_mae_avg = current_val_mae_avg.item() / dist.world_size
-
             if dist.rank == 0:
-                launchlog.log_epoch({"loss_valid": current_val_loss_avg})
-                launchlog.log_epoch({"mse_valid": current_val_mse_avg})
-                launchlog.log_epoch({"mae_valid": current_val_mae_avg})
+                launchlog.log_epoch({"loss_valid": current_val_loss_avg, \
+                                     "L1_valid": current_val_mae_avg, \
+                                     "L2_valid": current_val_mse_avg,})
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
                 if cfg.top_ckpt_mode == 'min':
@@ -452,8 +410,6 @@ def main(cfg: DictConfig) -> float:
                             
             if cfg.scheduler_name == 'plateau':
                 scheduler.step(current_val_loss_avg)
-            elif cfg.scheduler_name == 'cosine_warmup':
-                pass # handled in optimizer.step() in training loop
             else:
                 scheduler.step()
             
@@ -461,7 +417,7 @@ def main(cfg: DictConfig) -> float:
                 torch.distributed.barrier()
                 
     if dist.rank == 0:
-        logger.info("Start recovering the model from the top checkpoint to do torchscript conversion")         
+        logger0.info("Start recovering the model from the top checkpoint to do torchscript conversion")         
         #recover the model weight to the top checkpoint
         model = modulus.Module.from_checkpoint(top_checkpoints[0][1]).to(device)
 
@@ -475,7 +431,9 @@ def main(cfg: DictConfig) -> float:
         scripted_model = scripted_model.eval()
         save_file_torch = os.path.join(save_path, 'model.pt')
         scripted_model.save(save_file_torch)
-        logger.info(f"saved input/output normalizations and model to: {save_path}")
+        # save input and output normalizations
+        data.save_norm(save_path, True)
+        logger0.info(f"saved input/output normalizations and model to: {save_path}")
 
         mdlus_directory = os.path.join(save_path, 'ckpt')
         for filename in os.listdir(mdlus_directory):
@@ -492,8 +450,7 @@ def main(cfg: DictConfig) -> float:
                 scripted_model.save(save_path_torch)
                 print('save path for ckpt torchscript:', save_path_torch)
 
-
-        logger.info("Training complete!")
+        logger0.info("Training complete!")
 
     return current_val_loss_avg
 

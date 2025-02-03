@@ -11,36 +11,6 @@ import copy
 import string
 import h5py
 from tqdm import tqdm
-from typing import Literal
-
-MLBackendType = Literal["tensorflow", "pytorch"]
-
-def eliq(T):
-    """
-    Function taking temperature (in K) and outputting liquid saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
-                              0.206739458e-7,0.302950461e-5,0.264847430e-3,
-                              0.142986287e-1,0.443987641,6.11239921]);
-    c_liq = -80
-    T0 = 273.16
-    return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
-
-def eice(T):
-    """
-    Function taking temperature (in K) and outputting ice saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
-                      0.602588177e-7,0.615021634e-5,0.420895665e-3,
-                      0.188439774e-1,0.503160820,6.11147274]);
-    c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
-    T0 = 273.16
-    return (T>c_ice[0])*eliq(T)+\
-    (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
-    (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
-                       (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
 class data_utils:
     def __init__(self,
@@ -49,7 +19,7 @@ class data_utils:
                  input_max,
                  input_min,
                  output_scale,
-                 ml_backend: MLBackendType = "tensorflow",
+                 ml_backend = "tensorflow",
                  normalize = True,
                  input_abbrev = 'mli',
                  output_abbrev = 'mlo',
@@ -111,6 +81,33 @@ class data_utils:
                 self.successful_backend_import = True
             except ImportError:
                 raise ImportError("PyTorch is not installed.")
+
+    def eliq(T):
+        """
+        Function taking temperature (in K) and outputting liquid saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
+                                0.206739458e-7,0.302950461e-5,0.264847430e-3,
+                                0.142986287e-1,0.443987641,6.11239921]);
+        c_liq = -80
+        T0 = 273.16
+        return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
+
+    def eice(T):
+        """
+        Function taking temperature (in K) and outputting ice saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
+                        0.602588177e-7,0.615021634e-5,0.420895665e-3,
+                        0.188439774e-1,0.503160820,6.11147274]);
+        c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
+        T0 = 273.16
+        return (T>c_ice[0])*self.eliq(T)+\
+        (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
+        (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
+                        (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
         def find_keys(dictionary, value):
             keys = []
@@ -678,13 +675,14 @@ class data_utils:
         This function sets the inputs and outputs to the V6 subset.
         It also indicates the index of the surface pressure variable.
         '''
-        self.input_vars = self.v5_inputs
-        self.target_vars = self.v5_outputs
+        self.input_vars = self.v6_inputs
+        self.target_vars = self.v6_outputs
         self.ps_index = 1380
         self.input_feature_len = 1399
         self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True
+        self.full_vars_v6 = True
 
     def get_xrdata(self, file, file_vars = None):
         '''
@@ -700,7 +698,7 @@ class data_utils:
                 T00 = 253.16 # Temperature below which we use e_ice
                 omega = (tair - T00) / (T0 - T00)
                 omega = np.maximum( 0, np.minimum( 1, omega ))
-                esat =  omega * eliq(tair) + (1-omega) * eice(tair)
+                esat =  omega * self.eliq(tair) + (1-omega) * self.eice(tair)
                 Rd = 287 # Specific gas constant for dry air
                 Rv = 461 # Specific gas constant for water vapor    
                 qvs = (Rd*esat)/(Rv*ds['state_pmid'])
