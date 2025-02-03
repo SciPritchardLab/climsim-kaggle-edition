@@ -298,6 +298,29 @@ def main(cfg: DictConfig) -> float:
     if dist.world_size > 1:
         torch.distributed.barrier()
 
+    hyai = data.grid_info['hyai'].values
+    hybi = data.grid_info['hybi'].values
+    hyai = torch.tensor(hyai, dtype = torch.float32).to(device)
+    hybi = torch.tensor(hybi, dtype = torch.float32).to(device)
+
+    input_sub_device = torch.tensor(input_sub, dtype = torch.float32).to(device)
+    input_div_device = torch.tensor(input_div, dtype = torch.float32).to(device)
+    out_scale_device = torch.tensor(out_scale, dtype = torch.float32).to(device)
+
+    @StaticCaptureTraining(
+        model=model,
+        optim=optimizer,
+    )
+    def training_step(model, data_input, target):
+        output = model(data_input)
+        if cfg.do_energy_loss:
+            ps_raw = data_input[:,data.ps_index]*input_div[data.ps_index]+input_sub[data.ps_index]
+            loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
+            loss_orig = loss_orig + loss_energy_train
+        else:
+            loss = loss_weighted(output, target)
+        return loss
+
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
         return my_model(invar)
