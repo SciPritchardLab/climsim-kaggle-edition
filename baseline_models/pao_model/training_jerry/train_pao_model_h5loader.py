@@ -3,10 +3,11 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
+
+
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
@@ -17,18 +18,16 @@ from modulus.launch.logging import (
     initialize_mlflow,
 )
 from climsim_utils.data_utils import *
-from dataset_val import dataset_val
 from dataset_train import dataset_train
-import transformers
-
+from dataset_val import dataset_val
+from pao_model import pao_model
 import hydra
-from collections.abc import Iterable
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
 from soap import SOAP
-from torch.nn.utils import clip_grad_norm_
+
 
 # config_name gets overwritten in the SLURM script
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
@@ -207,13 +206,10 @@ def main(cfg: DictConfig) -> float:
     # create loss function
     criterion = None
     if cfg.loss == 'mse':
-        loss_fn = nn.MSELoss()
         criterion = nn.MSELoss()
     elif cfg.loss == 'mae':
-        loss_fn = nn.L1Loss()
         criterion = nn.L1Loss()
     elif cfg.loss == 'smoothL1':
-        loss_fn = nn.SmoothL1Loss()
         criterion = nn.SmoothL1Loss()
     if criterion is None:
         raise ValueError('Loss function not implemented')
@@ -293,9 +289,6 @@ def main(cfg: DictConfig) -> float:
                 output = model(data_input)
                 loss = criterion(output, target)
                 loss.backward()
-
-                if cfg.clip_grad:
-                    clip_grad_norm_(model.parameters(), max_norm=cfg.clip_grad_norm)
 
                 optimizer.step()
                 if cfg.scheduler_name == 'cosine_warmup':
