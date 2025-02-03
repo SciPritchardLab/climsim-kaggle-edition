@@ -21,13 +21,13 @@ from climsim_utils.data_utils import *
 from dataset_train import dataset_train
 from dataset_val import dataset_val
 from pao_model import pao_model
+
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
 from soap import SOAP
-
 
 # config_name gets overwritten in the SLURM script
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
@@ -82,32 +82,6 @@ def main(cfg: DictConfig) -> float:
     if not os.path.exists(cfg.val_input):
         raise ValueError('Validation input path does not exist')
 
-    val_dataset = dataset_val(input_paths = val_input_path, 
-                                  target_paths = val_target_path, 
-                                  input_sub = input_sub, 
-                                  input_div = input_div, 
-                                  out_scale = out_scale, 
-                                  qinput_prune = cfg.qinput_prune, 
-                                  output_prune = cfg.output_prune, 
-                                  strato_lev = cfg.strato_lev, 
-                                  strato_lev_out = cfg.strato_lev_out, 
-                                  qn_lbd = lbd_qn, 
-                                  decouple_cloud = cfg.decouple_cloud, 
-                                  aggressive_pruning = cfg.aggressive_pruning, 
-                                  strato_lev_qinput = cfg.strato_lev_qinput, 
-                                  strato_lev_tinput = cfg.strato_lev_tinput, 
-                                  input_clip = cfg.input_clip, 
-                                  input_clip_rhonly = cfg.input_clip_rhonly)
-
-    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
-    val_loader = DataLoader(val_dataset, 
-                            batch_size=cfg.batch_size, 
-                            shuffle=False,
-                            pin_memory=True,
-                            drop_last=False,
-                            sampler=val_sampler,
-                            num_workers=cfg.num_workers)
-    
     train_dataset = dataset_train(parent_path = cfg.data_path, 
                                     input_sub = input_sub, 
                                     input_div = input_div, 
@@ -133,6 +107,32 @@ def main(cfg: DictConfig) -> float:
                                 pin_memory=True,
                                 drop_last=True,
                                 num_workers=cfg.num_workers)
+
+    val_dataset = dataset_val(input_paths = val_input_path, 
+                                  target_paths = val_target_path, 
+                                  input_sub = input_sub, 
+                                  input_div = input_div, 
+                                  out_scale = out_scale, 
+                                  qinput_prune = cfg.qinput_prune, 
+                                  output_prune = cfg.output_prune, 
+                                  strato_lev = cfg.strato_lev, 
+                                  strato_lev_out = cfg.strato_lev_out, 
+                                  qn_lbd = lbd_qn, 
+                                  decouple_cloud = cfg.decouple_cloud, 
+                                  aggressive_pruning = cfg.aggressive_pruning, 
+                                  strato_lev_qinput = cfg.strato_lev_qinput, 
+                                  strato_lev_tinput = cfg.strato_lev_tinput, 
+                                  input_clip = cfg.input_clip, 
+                                  input_clip_rhonly = cfg.input_clip_rhonly)
+
+    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
+    val_loader = DataLoader(val_dataset, 
+                            batch_size=cfg.batch_size, 
+                            shuffle=False,
+                            pin_memory=True,
+                            drop_last=False,
+                            sampler=val_sampler,
+                            num_workers=cfg.num_workers)
                               
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -215,9 +215,43 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Loss function not implemented')
     mse_criterion = nn.MSELoss()
     mae_criterion = nn.L1Loss()
+
+    def loss_weighted(pred, target):
+        if cfg.variable_subsets in ['v1','v1_dyn']:
+            raise ValueError('Weighted loss not implemented for v1/v1_dyn')
+        # dt_weight = 1.0
+        # dq1_weight = 1.0
+        # dq2_weight = 1.0
+        # dq3_weight = 1.0
+        # du_weight = 1.0
+        # dv_weight = 1.0
+        # d2d_weight = 1.0
+
+        # pred should be of shape (batch_size, 368)
+        # target should be of shape (batch_size, 368)
+        # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
+        #only do the calculation if any of the weights are not 1.0
+        if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
+            return criterion(pred, target)
+        pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
+        pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
+        pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
+        pred[:,180:240] = pred[:,180:240] * cfg.dq3_weight
+        pred[:,240:300] = pred[:,240:300] * cfg.du_weight
+        pred[:,300:360] = pred[:,300:360] * cfg.dv_weight
+        pred[:,360:368] = pred[:,360:368] * cfg.d2d_weight
+        target[:,0:60] = target[:,0:60] * cfg.dt_weight
+        target[:,60:120] = target[:,60:120] * cfg.dq1_weight
+        target[:,120:180] = target[:,120:180] * cfg.dq2_weight
+        target[:,180:240] = target[:,180:240] * cfg.dq3_weight
+        target[:,240:300] = target[:,240:300] * cfg.du_weight
+        target[:,300:360] = target[:,300:360] * cfg.dv_weight
+        target[:,360:368] = target[:,360:368] * cfg.d2d_weight
+        return criterion(pred, target)
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
+    logger0 = RankZeroLoggingWrapper(logger, dist)
 
     if cfg.logger == 'wandb':
         # Initialize the MLFlow logger
@@ -241,7 +275,7 @@ def main(cfg: DictConfig) -> float:
         LaunchLogger.initialize(use_mlflow=True)
 
     if cfg.save_top_ckpts<=0:
-        logger.info("Checkpoints should be set > 0, setting to 1")
+        logger0.info("Checkpoints should be set > 0, setting to 1")
         num_top_ckpts = 1
     else:
         num_top_ckpts = cfg.save_top_ckpts
@@ -268,7 +302,7 @@ def main(cfg: DictConfig) -> float:
     def eval_step_forward(my_model, invar):
         return my_model(invar)
     #training block
-    logger.info("Starting Training!")
+    logger0.info("Starting Training!")
     # Basic training block with tqdm for progress tracking
     for epoch in range(cfg.epochs):
         if dist.distributed:
@@ -386,7 +420,7 @@ def main(cfg: DictConfig) -> float:
                 torch.distributed.barrier()
                 
     if dist.rank == 0:
-        logger.info("Start recovering the model from the top checkpoint to do torchscript conversion")         
+        logger0.info("Start recovering the model from the top checkpoint to do torchscript conversion")         
         #recover the model weight to the top checkpoint
         model = modulus.Module.from_checkpoint(top_checkpoints[0][1]).to(device)
 
@@ -400,7 +434,7 @@ def main(cfg: DictConfig) -> float:
         scripted_model = scripted_model.eval()
         save_file_torch = os.path.join(save_path, 'model.pt')
         scripted_model.save(save_file_torch)
-        logger.info(f"saved input/output normalizations and model to: {save_path}")
+        logger0.info(f"saved input/output normalizations and model to: {save_path}")
 
         mdlus_directory = os.path.join(save_path, 'ckpt')
         for filename in os.listdir(mdlus_directory):
@@ -418,7 +452,7 @@ def main(cfg: DictConfig) -> float:
                 print('save path for ckpt torchscript:', save_path_torch)
 
 
-        logger.info("Training complete!")
+        logger0.info("Training complete!")
 
     return current_val_loss_avg
 
