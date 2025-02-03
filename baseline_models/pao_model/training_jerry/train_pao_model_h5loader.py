@@ -311,12 +311,7 @@ def main(cfg: DictConfig) -> float:
     )
     def training_step(model, data_input, target):
         output = model(data_input)
-        if cfg.do_energy_loss:
-            ps_raw = data_input[:,data.ps_index]*input_div[data.ps_index]+input_sub[data.ps_index]
-            loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
-            loss_orig = loss_orig + loss_energy_train
-        else:
-            loss = loss_weighted(output, target)
+        loss = loss_weighted(output, target)
         return loss
 
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
@@ -330,22 +325,15 @@ def main(cfg: DictConfig) -> float:
             train_sampler.set_epoch(epoch)
 
         with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=cfg.mini_batch_log_freq) as launchlog:
-            model.train()
-            
-            total_iterations = len(train_loader)
 
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
-            for iteration, (data_input, target) in enumerate(train_loop):
+            for data_input, target in train_loop:
                 if cfg.early_stop_step > 0 and current_step > cfg.early_stop_step:
                     break
                 data_input, target = data_input.to(device), target.to(device)
-                optimizer.zero_grad()
-                output = model(data_input)
-                loss = criterion(output, target)
-                loss.backward()
 
-                optimizer.step()
+                loss = training_step(model, data_input, target)
 
                 launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
                 # Update the progress bar description with the current loss
@@ -353,13 +341,10 @@ def main(cfg: DictConfig) -> float:
                 train_loop.set_postfix(loss=loss.item())
                 current_step += 1
             
-            model.eval()
             val_loss = 0.0
             val_mse = 0.0
             val_mae = 0.0
-            if cfg.do_energy_loss:
-                val_energy_loss = 0.0
-                val_orig = 0.0
+
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')
             current_step = 0
@@ -370,13 +355,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 output = eval_step_forward(model, data_input)
-                if cfg.do_energy_loss:
-                    ps_raw = data_input[:,data.ps_index]*input_div[data.ps_index]+input_sub[data.ps_index]
-                    loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
-                    loss_orig = loss_weighted(output, target)
-                    loss = loss_orig + loss_energy_train
-                else:
-                    loss = loss_weighted(output, target)
+                loss = loss_weighted(output, target)
                 mse = mse_criterion(output, target)
                 mae = mae_criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
@@ -390,11 +369,6 @@ def main(cfg: DictConfig) -> float:
                 current_val_mae_avg = val_mae / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
-                if cfg.do_energy_loss:
-                    val_energy_loss += loss_energy_train.item() * data_input.size(0)
-                    val_orig += loss_orig.item() * data_input.size(0)
-                    current_val_loss_avg_energy = val_energy_loss / num_samples_processed
-                    current_val_loss_avg_orig = val_orig / num_samples_processed
                 del data_input, target, output
                     
             
@@ -404,16 +378,9 @@ def main(cfg: DictConfig) -> float:
                 current_val_loss_avg = current_val_loss_avg.item() / dist.world_size
 
             if dist.rank == 0:
-                if cfg.do_energy_loss:
-                    launchlog.log_epoch({"loss_valid": current_val_loss_avg, \
-                                         "loss_energy_valid": current_val_loss_avg_energy, \
-                                         "loss_orig_valid": current_val_loss_avg_orig, \
-                                         "L1_valid": current_val_mae_avg, \
-                                         "L2_valid": current_val_mse_avg,})
-                else:
-                    launchlog.log_epoch({"loss_valid": current_val_loss_avg, \
-                                         "L1_valid": current_val_mae_avg, \
-                                         "L2_valid": current_val_mse_avg,})
+                launchlog.log_epoch({"loss_valid": current_val_loss_avg, \
+                                     "L1_valid": current_val_mae_avg, \
+                                     "L2_valid": current_val_mse_avg,})
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
                 if cfg.top_ckpt_mode == 'min':
