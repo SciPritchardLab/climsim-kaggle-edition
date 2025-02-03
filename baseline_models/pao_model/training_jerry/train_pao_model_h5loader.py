@@ -20,8 +20,8 @@ from modulus.launch.logging import (
 from climsim_utils.data_utils import *
 from dataset_train import dataset_train
 from dataset_val import dataset_val
-from pao_model import pao_model
 
+from pao_model import pao_model
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
@@ -42,6 +42,11 @@ def main(cfg: DictConfig) -> float:
     input_min = xr.open_dataset(cfg.input_min)
     output_scale = xr.open_dataset(cfg.output_scale)
 
+
+
+
+
+
     lbd_qn = np.loadtxt(cfg.qn_lbd, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 
@@ -59,8 +64,6 @@ def main(cfg: DictConfig) -> float:
         data.set_to_v2_vars()
     elif cfg.variable_subsets == 'v2_dyn':
         data.set_to_v2_dyn_vars()
-    elif cfg.variable_subsets == 'v2_rh':
-        data.set_to_v2_rh_vars()
     elif cfg.variable_subsets == 'v3':
         data.set_to_v3_vars()
     elif cfg.variable_subsets == 'v4':
@@ -77,10 +80,11 @@ def main(cfg: DictConfig) -> float:
 
     input_sub, input_div, out_scale = data.save_norm(save_path = '.', write=True)
 
-    val_input_path = cfg.val_input
-    val_target_path = cfg.val_target
-    if not os.path.exists(cfg.val_input):
-        raise ValueError('Validation input path does not exist')
+
+    val_input_path = os.path.join(cfg.data_path, cfg.val_input)
+    val_target_path = os.path.join(cfg.data_path, cfg.val_target)
+    if not os.path.exists(val_input_path) or not os.path.exists(val_target_path):
+        raise ValueError('Validation path does not exist')
 
     train_dataset = dataset_train(parent_path = cfg.data_path, 
                                     input_sub = input_sub, 
@@ -104,8 +108,8 @@ def main(cfg: DictConfig) -> float:
                                 batch_size=cfg.batch_size, 
                                 shuffle=False if dist.distributed else True,
                                 sampler=train_sampler,
-                                pin_memory=True,
                                 drop_last=True,
+                                pin_memory=torch.cuda.is_available(),
                                 num_workers=cfg.num_workers)
 
     val_dataset = dataset_val(input_paths = val_input_path, 
@@ -129,14 +133,18 @@ def main(cfg: DictConfig) -> float:
     val_loader = DataLoader(val_dataset, 
                             batch_size=cfg.batch_size, 
                             shuffle=False,
-                            pin_memory=True,
-                            drop_last=False,
                             sampler=val_sampler,
                             num_workers=cfg.num_workers)
                               
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
+
+    # TO DO: CHECK WHICH OF THESE ARE RELEVANT
+
+    # tmp_output_prune = cfg.output_prune
+    # tmp_strato_lev_out = cfg.strato_lev_out
+
     model = pao_model(
             num_seq_inputs = cfg.num_seq_inputs,
             num_scalar_inputs = cfg.num_scalar_inputs,
@@ -324,7 +332,7 @@ def main(cfg: DictConfig) -> float:
         if dist.distributed:
             train_sampler.set_epoch(epoch)
 
-        with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=cfg.mini_batch_log_freq) as launchlog:
+        with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=10) as launchlog:
 
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
