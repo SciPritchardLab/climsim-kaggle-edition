@@ -198,8 +198,6 @@ def main(cfg: DictConfig) -> float:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg.scheduler.plateau.factor, patience=cfg.scheduler.plateau.patience, verbose=True)
     elif cfg.scheduler_name == 'cosine':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.scheduler.cosine.T_max, eta_min=cfg.scheduler.cosine.eta_min)
-    elif cfg.scheduler_name == 'cosine_warmup':
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=cfg.scheduler.cosine_warmup.T_0, T_mult=cfg.scheduler.cosine_warmup.T_mult, eta_min=cfg.scheduler.cosine_warmup.eta_min)
     if scheduler is None:
         raise ValueError('Scheduler not implemented')
     
@@ -348,8 +346,6 @@ def main(cfg: DictConfig) -> float:
                 loss.backward()
 
                 optimizer.step()
-                if cfg.scheduler_name == 'cosine_warmup':
-                    scheduler.step(epoch + iteration / total_iterations)
 
                 launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
                 # Update the progress bar description with the current loss
@@ -361,6 +357,9 @@ def main(cfg: DictConfig) -> float:
             val_loss = 0.0
             val_mse = 0.0
             val_mae = 0.0
+            if cfg.do_energy_loss:
+                val_energy_loss = 0.0
+                val_orig = 0.0
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')
             current_step = 0
@@ -371,7 +370,13 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 output = eval_step_forward(model, data_input)
-                loss = consistency_loss(output, target)
+                if cfg.do_energy_loss:
+                    ps_raw = data_input[:,data.ps_index]*input_div[data.ps_index]+input_sub[data.ps_index]
+                    loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
+                    loss_orig = loss_weighted(output, target)
+                    loss = loss_orig + loss_energy_train
+                else:
+                    loss = loss_weighted(output, target)
                 mse = mse_criterion(output, target)
                 mae = mae_criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
@@ -385,6 +390,11 @@ def main(cfg: DictConfig) -> float:
                 current_val_mae_avg = val_mae / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
+                if cfg.do_energy_loss:
+                    val_energy_loss += loss_energy_train.item() * data_input.size(0)
+                    val_orig += loss_orig.item() * data_input.size(0)
+                    current_val_loss_avg_energy = val_energy_loss / num_samples_processed
+                    current_val_loss_avg_orig = val_orig / num_samples_processed
                 del data_input, target, output
                     
             
@@ -393,18 +403,17 @@ def main(cfg: DictConfig) -> float:
                 torch.distributed.all_reduce(current_val_loss_avg)
                 current_val_loss_avg = current_val_loss_avg.item() / dist.world_size
 
-                current_val_mse_avg = torch.tensor(current_val_mse_avg, device=dist.device)
-                torch.distributed.all_reduce(current_val_mse_avg)
-                current_val_mse_avg = current_val_mse_avg.item() / dist.world_size
-
-                current_val_mae_avg = torch.tensor(current_val_mae_avg, device=dist.device)
-                torch.distributed.all_reduce(current_val_mae_avg)
-                current_val_mae_avg = current_val_mae_avg.item() / dist.world_size
-
             if dist.rank == 0:
-                launchlog.log_epoch({"loss_valid": current_val_loss_avg})
-                launchlog.log_epoch({"mse_valid": current_val_mse_avg})
-                launchlog.log_epoch({"mae_valid": current_val_mae_avg})
+                if cfg.do_energy_loss:
+                    launchlog.log_epoch({"loss_valid": current_val_loss_avg, \
+                                         "loss_energy_valid": current_val_loss_avg_energy, \
+                                         "loss_orig_valid": current_val_loss_avg_orig, \
+                                         "L1_valid": current_val_mae_avg, \
+                                         "L2_valid": current_val_mse_avg,})
+                else:
+                    launchlog.log_epoch({"loss_valid": current_val_loss_avg, \
+                                         "L1_valid": current_val_mae_avg, \
+                                         "L2_valid": current_val_mse_avg,})
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
                 if cfg.top_ckpt_mode == 'min':
@@ -434,8 +443,6 @@ def main(cfg: DictConfig) -> float:
                             
             if cfg.scheduler_name == 'plateau':
                 scheduler.step(current_val_loss_avg)
-            elif cfg.scheduler_name == 'cosine_warmup':
-                pass # handled in optimizer.step() in training loop
             else:
                 scheduler.step()
             
@@ -457,6 +464,8 @@ def main(cfg: DictConfig) -> float:
         scripted_model = scripted_model.eval()
         save_file_torch = os.path.join(save_path, 'model.pt')
         scripted_model.save(save_file_torch)
+        # save input and output normalizations
+        data.save_norm(save_path, True)
         logger0.info(f"saved input/output normalizations and model to: {save_path}")
 
         mdlus_directory = os.path.join(save_path, 'ckpt')
@@ -473,7 +482,6 @@ def main(cfg: DictConfig) -> float:
                 save_path_torch = os.path.join(mdlus_directory, filename.replace('.mdlus', '.pt'))
                 scripted_model.save(save_path_torch)
                 print('save path for ckpt torchscript:', save_path_torch)
-
 
         logger0.info("Training complete!")
 
