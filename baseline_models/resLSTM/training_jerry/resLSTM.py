@@ -100,8 +100,8 @@ class resLSTM(modulus.Module):
 
         if self.output_prune:
             outputs = outputs.clone()
-            outputs[:, 60:60+self.strato_lev_out] = y[:, 60:60+self.strato_lev_out].clone().zero_()
-            outputs[:, 120:120+self.strato_lev_out] = y[:, 120:120+self.strato_lev_out].clone().zero_()
-            outputs[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
-            outputs[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
+            outputs[:, 60:60+self.strato_lev_out] = outputs[:, 60:60+self.strato_lev_out].clone().zero_()
+            outputs[:, 120:120+self.strato_lev_out] = outputs[:, 120:120+self.strato_lev_out].clone().zero_()
+            outputs[:, 180:180+self.strato_lev_out] = outputs[:, 180:180+self.strato_lev_out].clone().zero_()
+            outputs[:, 240:240+self.strato_lev_out] = outputs[:, 240:240+self.strato_lev_out].clone().zero_()
         return outputs

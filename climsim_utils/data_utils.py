@@ -619,11 +619,11 @@ class data_utils:
         self.ps_index = 120
         self.full_vars = False
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
-        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
-        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_single_num # 124
-        self.target_feature_len = self.target_series_num * 60 + self.target_single_num # 128
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 124
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
 
     def set_to_v2_vars(self):
         '''
@@ -635,11 +635,11 @@ class data_utils:
         self.ps_index = 360
         self.full_vars = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
-        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
-        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_single_num # 557
-        self.target_feature_len = self.target_series_num * 60 + self.target_single_num # 368
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_vars(self):
         '''
@@ -651,11 +651,11 @@ class data_utils:
         self.ps_index = 360
         self.full_vars = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
-        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
-        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_single_num # 557
-        self.target_feature_len = self.target_series_num * 60 + self.target_single_num # 368
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v4_vars(self):
         '''
@@ -667,11 +667,11 @@ class data_utils:
         self.ps_index = 1500
         self.full_vars = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
-        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
-        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_single_num # 1525
-        self.target_feature_len = self.target_series_num * 60 + self.target_single_num # 368
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1525
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
     
     def set_to_v5_vars(self):
         '''
@@ -684,11 +684,11 @@ class data_utils:
         self.full_vars = False
         self.full_vars_v5 = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
-        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
-        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_single_num # 1405
-        self.target_feature_len = self.target_series_num * 60 + self.target_single_num # 308
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1405
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def set_to_v6_vars(self):
         '''
@@ -702,11 +702,11 @@ class data_utils:
         self.full_vars_v5 = True
         self.full_vars_v6 = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
-        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
-        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_single_num # 1399
-        self.target_feature_len = self.target_series_num * 60 + self.target_single_num # 308
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def get_xrdata(self, file, file_vars = None):
         '''
