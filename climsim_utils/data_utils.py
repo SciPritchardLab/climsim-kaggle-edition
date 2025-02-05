@@ -620,6 +620,10 @@ class data_utils:
         self.input_feature_len = 124
         self.target_feature_len = 128
         self.full_vars = False
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
 
     def set_to_v2_vars(self):
         '''
@@ -632,6 +636,10 @@ class data_utils:
         self.input_feature_len = 557
         self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
 
     def set_to_v2_rh_vars(self):
         '''
@@ -644,6 +652,10 @@ class data_utils:
         self.input_feature_len = 557
         self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
 
     def set_to_v4_vars(self):
         '''
@@ -656,6 +668,10 @@ class data_utils:
         self.input_feature_len = 1525
         self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
     
     def set_to_v5_vars(self):
         '''
@@ -669,6 +685,10 @@ class data_utils:
         self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
 
     def set_to_v6_vars(self):
         '''
@@ -683,6 +703,10 @@ class data_utils:
         self.full_vars = False
         self.full_vars_v5 = True
         self.full_vars_v6 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_single_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_single_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
 
     def get_xrdata(self, file, file_vars = None):
         '''
