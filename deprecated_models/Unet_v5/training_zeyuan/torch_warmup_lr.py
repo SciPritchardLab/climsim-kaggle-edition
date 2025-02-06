@@ -4,7 +4,7 @@ import numpy as np
 import math 
 
 '''
-copied from https://github.com/lehduong/torch-warmup-lr/blob/master/torch_warmup_lr/wrappers.py
+Originally from https://github.com/lehduong/torch-warmup-lr/blob/master/torch_warmup_lr/wrappers.py
 '''
 
 class WarmupLR(_LRScheduler):

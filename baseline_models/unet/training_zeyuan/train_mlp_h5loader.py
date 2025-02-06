@@ -18,12 +18,13 @@ from modulus.launch.logging import (
     initialize_mlflow,
 )
 from climsim_utils.data_utils import *
-
 from climsim_datapip import climsim_dataset
 from climsim_datapip_h5 import climsim_dataset_h5
-from climsim_unet import ClimsimUnet
-import climsim_unet as climsim_unet
+from mlp import MLP
+import mlp as mlp
+
 import hydra
+from collections.abc import Iterable
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
@@ -150,32 +151,29 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    tmp_unet_model_channels = int(cfg.unet_model_channels)
-    tmp_unet_attn_resolutions = [i for i in cfg.unet_attn_resolutions]
-    tmp_unet_num_blocks = int(cfg.unet_num_blocks)
     tmp_output_prune = cfg.output_prune
     tmp_strato_lev = cfg.strato_lev_out
-    tmp_loc_embedding = cfg.loc_embedding
-    tmp_skip_conv = cfg.skip_conv
-    tmp_prev_2d = cfg.prev_2d
-    tmp_dropout = cfg.dropout
+    tmp_mlp_hidden_dims = cfg.mlp_hidden_dims
+    if isinstance(tmp_mlp_hidden_dims, Iterable) and not isinstance(tmp_mlp_hidden_dims, list):
+        print('Input is iterable but not a list. Converting to list...')
+        tmp_mlp_hidden_dims = list(tmp_mlp_hidden_dims)
+    else:
+        print('Input is already a list or not iterable')
 
-    model = ClimsimUnet(
-        num_vars_profile = input_size//60,
-        num_vars_scalar = input_size%60,
-        num_vars_profile_out = output_size//60,
-        num_vars_scalar_out = output_size%60,
-        seq_resolution = 64,
-        model_channels = tmp_unet_model_channels,
-        channel_mult = [1, 2, 2, 2],
-        num_blocks = tmp_unet_num_blocks,
-        attn_resolutions = tmp_unet_attn_resolutions,
-        dropout = tmp_dropout,
-        output_prune=tmp_output_prune,
-        strato_lev=tmp_strato_lev,
-        loc_embedding=tmp_loc_embedding,
-        skip_conv=tmp_skip_conv,
-        prev_2d=tmp_prev_2d
+    print(f"Type of tmp_mlp_hidden_dims: {type(tmp_mlp_hidden_dims)}")
+    if isinstance(tmp_mlp_hidden_dims, list):
+        print('input is list')
+    else:
+        print('input is not list')
+    tmp_mlp_layers = cfg.mlp_layers
+    print('MLP init arguments: ', input_size, output_size, tmp_mlp_hidden_dims, tmp_mlp_layers, tmp_output_prune, tmp_strato_lev)
+    model = MLP(
+        in_dims = input_size,
+        out_dims = output_size,
+        hidden_dims = tmp_mlp_hidden_dims,
+        layers = tmp_mlp_layers,
+        output_prune = tmp_output_prune,
+        strato_lev_out = tmp_strato_lev,
     ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -525,7 +523,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        climsim_unet.device = "cpu"
+        mlp.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)

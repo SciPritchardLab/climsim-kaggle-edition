@@ -29,8 +29,8 @@ class ClimsimUnetMetaData(modulus.ModelMetaData):
     # Optimization
     jit: bool = True
     cuda_graphs: bool = True
-    amp_cpu: bool = False
-    amp_gpu: bool = False
+    amp_cpu: bool = True
+    amp_gpu: bool = True
 
 class ClimsimUnet(modulus.Module):
     def __init__(
@@ -57,10 +57,11 @@ class ClimsimUnet(modulus.Module):
             n_model_levels: int = 60,
             # qinput_prune=False, 
             output_prune=False, 
-            strato_lev=12,
+            strato_lev_out=12,
             loc_embedding: bool = False,
             skip_conv: bool = False,
-            prev_2d: bool = False
+            prev_2d: bool = False,
+            skip_phys_tend = False,
             ):
         
         super().__init__(meta=ClimsimUnetMetaData())
@@ -71,7 +72,7 @@ class ClimsimUnet(modulus.Module):
         self.num_vars_scalar_out = num_vars_scalar_out
         self.model_channels = model_channels
 
-        self.in_channels = num_vars_profile + num_vars_scalar
+        self.in_channels = num_vars_profile + num_vars_scalar + 7 # +(8-1)=7 for the location embedding
         self.out_channels = num_vars_profile_out + num_vars_scalar_out
         # print('1: out_channels', self.out_channels)
 
@@ -109,10 +110,11 @@ class ClimsimUnet(modulus.Module):
         self.input_padding = (seq_resolution-n_model_levels,0)
         # self.qinput_prune=qinput_prune
         self.output_prune=output_prune
-        self.strato_lev=strato_lev
+        self.strato_lev_out=strato_lev_out
         self.loc_embedding = loc_embedding
         self.skip_conv = skip_conv
         self.prev_2d = prev_2d
+        self.skip_phys_tend = skip_phys_tend
 
         # emb_channels = model_channels * channel_mult_emb
         # self.emb_channels = emb_channels
@@ -265,6 +267,7 @@ class ClimsimUnet(modulus.Module):
                 )
 
         # create a 385x8 trainable weight embedding for the input
+        self.emb_loc = torch.nn.Parameter(torch.randn(385, 8), requires_grad=True)
                        
     def forward(self, x):
         '''
@@ -275,18 +278,29 @@ class ClimsimUnet(modulus.Module):
 
         # if self.qinput_prune:
         #     x = x.clone()  # Clone the tensor to ensure you're not modifying the original tensor in-place
-        #     x[:, 60:60+self.strato_lev] = x[:, 60:60+self.strato_lev].clone().zero_()  # Set stratosphere q1 to 0
-        #     x[:, 120:120+self.strato_lev] = x[:, 120:120+self.strato_lev].clone().zero_()  # Set stratosphere q2 to 0
-        #     x[:, 180:180+self.strato_lev] = x[:, 180:180+self.strato_lev].clone().zero_()  # Set stratosphere q3 to 0
+        #     x[:, 60:60+self.strato_lev_out] = x[:, 60:60+self.strato_lev_out].clone().zero_()  # Set stratosphere q1 to 0
+        #     x[:, 120:120+self.strato_lev_out] = x[:, 120:120+self.strato_lev_out].clone().zero_()  # Set stratosphere q2 to 0
+        #     x[:, 180:180+self.strato_lev_out] = x[:, 180:180+self.strato_lev_out].clone().zero_()  # Set stratosphere q3 to 0
 
-        # if not self.prev_2d:
-        #     x = x.clone()
-        #     x[:,-8:-3] = x[:,-8:-3].clone().zero_()
+        if not self.prev_2d:
+            x = x.clone()
+            x[:,-8:-3] = x[:,-8:-3].clone().zero_()
 
         # split x into x_profile and x_scalar
         x_profile = x[:,:self.num_vars_profile*self.n_model_levels]
-        x_scalar = x[:,self.num_vars_profile*self.n_model_levels:]
+        x_scalar = x[:,self.num_vars_profile*self.n_model_levels:-1]
+        x_loc = x[:,-1] # location index
 
+        # right now x_loc is only 1-384, use 0 to represent not using position embedding
+        if not self.loc_embedding:
+            x_loc[:] = 0.0*x_loc[:]
+        #convert x_loc to embedding, first use one-hot encoding to convert x_loc to (batch, 385)
+        # convert x_loc to one-hot encoding
+        x_loc = torch.nn.functional.one_hot(x_loc.to(torch.int64), num_classes=385)
+        # convert x_loc from int to float
+        x_loc = x_loc.to(torch.float32)
+        # convert x_loc to embedding
+        x_loc = torch.matmul(x_loc, self.emb_loc) # (batch, 8)
 
         # print(x_profile.shape, x_scalar.shape, x_loc.shape)
 
@@ -295,8 +309,12 @@ class ClimsimUnet(modulus.Module):
         # broadcast x_scalar to (batch, num_vars_scalar, levels)
         x_scalar = x_scalar.unsqueeze(2).expand(-1, -1, self.n_model_levels)
 
+        # if self.skip_phys_tend:
+        #     x_phys_tend_skip = x_profile[:,12:16,:].clone()
+
+
         #concatenate x_profile, x_scalar, x_loc to (batch, num_vars_profile+num_vars_scalar+8, levels)
-        x = torch.cat((x_profile, x_scalar), dim=1)
+        x = torch.cat((x_profile, x_scalar, x_loc.unsqueeze(2).expand(-1, -1, self.n_model_levels)), dim=1)
         # print('2:', x.shape)
         # x = torch.cat((x_profile, x_scalar), dim=1)
         
@@ -374,13 +392,21 @@ class ClimsimUnet(modulus.Module):
         #concatenate y_profile and y_scalar to (batch, num_vars_profile_out*levels+num_vars_scalar_out)
         y = torch.cat((y_profile, y_scalar), dim=1)
 
+        # if self.skip_phys_tend:
+        #     y = y.clone()
+        #     y[:,0:60] = y[:,0:60].clone() + x_phys_tend_skip[:,0,:]
+        #     y[:,60:120] = y[:,60:120].clone() + x_phys_tend_skip[:,1,:]
+        #     y[:,120:180] = y[:,120:180].clone() + x_phys_tend_skip[:,2,:]
+        #     y[:,180:240] = y[:,180:240].clone() + x_phys_tend_skip[:,3,:]
+            
+            # x_phys_tend_skip = x_profile[:,12:16,:].clone()
+
         if self.output_prune:
             y = y.clone()
-            y[:, 60:60+self.strato_lev] = y[:, 60:60+self.strato_lev].clone().zero_()
-            y[:, 120:120+self.strato_lev] = y[:, 120:120+self.strato_lev].clone().zero_()
-            y[:, 180:180+self.strato_lev] = y[:, 180:180+self.strato_lev].clone().zero_()
-            y[:, 240:240+self.strato_lev] = y[:, 240:240+self.strato_lev].clone().zero_()
-            # y[:, 300:300+self.strato_lev] = y[:, 300:300+self.strato_lev].clone().zero_()
+            y[:, 60:60+self.strato_lev_out] = y[:, 60:60+self.strato_lev_out].clone().zero_()
+            y[:, 120:120+self.strato_lev_out] = y[:, 120:120+self.strato_lev_out].clone().zero_()
+            y[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
+            y[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
 
         return y
     

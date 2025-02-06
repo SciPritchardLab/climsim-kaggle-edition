@@ -29,41 +29,43 @@ class pao_model_metadata(modulus.ModelMetaData):
 
 class pao_model(modulus.Module):
     def __init__(self,
-                 num_seq_inputs: int = 23, # number of input sequences
-                 num_scalar_inputs: int = 19, # number of input scalars
-                 num_seq_targets: int = 5, # number of target sequences
-                 num_scalar_targets: int = 8, # number of target scalars
-                 num_hidden_seq: int = 128, # number of hidden units in MLP for sequences
-                 num_hidden_scalar: int = 128, # number of hidden units in MLP for scalars
+                 input_series_num: int = 23, # number of input seriesuences
+                 input_scalar_num: int = 19, # number of input scalar
+                 target_series_num: int = 5, # number of target seriesuences
+                 target_scalar_num: int = 8, # number of target scalar
+                 hidden_series_num: int = 128, # number of hidden units in MLP for seriesuences
+                 hidden_scalar_num: int = 128, # number of hidden units in MLP for scalar
+                 output_prune: bool = True, # whether or not we prune strato_lev_out levels
+                 strato_lev_out: int = 12, # number of levels to set to zero
                 ):
         super().__init__(meta = pao_model_metadata())
-        self.num_seq_inputs = num_seq_inputs
-        self.num_scalar_inputs = num_scalar_inputs
-        self.num_seq_targets = num_seq_targets
-        self.num_scalar_targets = num_scalar_targets
-        self.num_hidden_seq = num_hidden_seq
-        self.num_hidden_scalar = num_hidden_scalar
-        self.num_hidden_total = self.num_hidden_seq + self.num_hidden_scalar
-        # 60 sequences 1d cnn
+        self.input_series_num = input_series_num
+        self.input_scalar_num = input_scalar_num
+        self.target_series_num = target_series_num
+        self.target_scalar_num = target_scalar_num
+        self.hidden_series_num = hidden_series_num
+        self.hidden_scalar_num = hidden_scalar_num
+        self.num_hidden_total = self.hidden_series_num + self.hidden_scalar_num
+        # 60 seriesuences 1d cnn
         self.feature_scale = nn.ModuleList([
-            FeatureScale(60) for _ in range(self.num_seq_inputs)
+            FeatureScale(60) for _ in range(self.input_series_num)
         ])
-        self.positional_encoding = nn.Embedding(60, self.num_hidden_seq)
-        self.input_linear = nn.Linear(self.num_seq_inputs, self.num_hidden_seq)  # current, diff
+        self.positional_encoding = nn.Embedding(60, self.hidden_series_num)
+        self.input_linear = nn.Linear(self.input_series_num, self.hidden_series_num)  # current, diff
         self.other_feats_mlp = nn.Sequential(
-            nn.Linear(self.num_scalar_inputs, self.num_hidden_scalar),
-            nn.BatchNorm1d(self.num_hidden_scalar),
+            nn.Linear(self.input_scalar_num, self.hidden_scalar_num),
+            nn.BatchNorm1d(self.hidden_scalar_num),
             # nn.ReLU(),
             nn.GELU(),
-            nn.Linear(self.num_hidden_scalar, self.num_hidden_scalar),
-            nn.BatchNorm1d(self.num_hidden_scalar),
+            nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num),
+            nn.BatchNorm1d(self.hidden_scalar_num),
             # nn.ReLU(),
             nn.GELU()
         )
-        self.other_feats_proj = nn.ModuleList([nn.Linear(self.num_hidden_scalar, self.num_hidden_scalar) for _ in range(60)])
+        self.other_feats_proj = nn.ModuleList([nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num) for _ in range(60)])
         # layer norm
         self.layer_norm_in = self.num_hidden_total
-        self.seq_layer_norm = nn.LayerNorm(self.layer_norm_in)
+        self.series_layer_norm = nn.LayerNorm(self.layer_norm_in)
         # cnn
         self.cnn1 = nn.Sequential(
             ResidualBlock(self.num_hidden_total, self.num_hidden_total, 5, 1, 2),
@@ -76,37 +78,48 @@ class pao_model(modulus.Module):
             nn.LSTM(self.num_hidden_total, self.num_hidden_total, 2, batch_first=True, bidirectional=True, dropout=0.0),
         )
         # output layer
-        self.output_seq_mlp_input_dim = self.num_hidden_total
-        self.seq_output_mlp = nn.Sequential(
-            nn.Linear(self.output_seq_mlp_input_dim, self.num_hidden_total),
+        self.output_series_mlp_input_dim = self.num_hidden_total
+        self.series_output_mlp = nn.Sequential(
+            nn.Linear(self.output_series_mlp_input_dim, self.num_hidden_total),
             nn.GELU(),
             nn.Linear(self.num_hidden_total, self.num_hidden_total),
             nn.GELU(),
-            nn.Linear(self.num_hidden_total, self.num_hidden_seq),
+            nn.Linear(self.num_hidden_total, self.hidden_series_num),
             nn.GELU(),
-            nn.Linear(self.num_hidden_seq, self.num_seq_targets)
+            nn.Linear(self.hidden_series_num, self.target_series_num)
         )
         self.output_scalar_mlp_input_dim = self.num_hidden_total * 60
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
         self.scalar_output_mlp = nn.Sequential(
-            nn.Linear(self.output_scalar_mlp_input_dim, self.num_hidden_scalar),
+            nn.Linear(self.output_scalar_mlp_input_dim, self.hidden_scalar_num),
             # nn.ReLU(),
             nn.GELU(),
-            nn.Linear(self.num_hidden_scalar, self.num_hidden_scalar),
+            nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num),
             # nn.ReLU(),
             nn.GELU(),
-            nn.Linear(self.num_hidden_scalar, self.num_scalar_targets)
+            nn.Linear(self.hidden_scalar_num, self.target_scalar_num)
         )
+
+    def reshape_input(self, x):
+        series_inputs = x[:,:self.input_series_num*60].reshape(self.input_series_num, 60)
+        scalar_inputs = x[self.input_series_num*60:]
+        return series_inputs, scalar_inputs
+
+    def reshape_output(self, series_output, scalar_output):
+        return torch.concat([series_output, scalar_output], dim = 1)
     
     def count_trainable_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def forward(self, seq_features, scalar_features):
+    def forward(self, x):
+        x = self.reshape_input(x)
+        # create series_features
+        # create scalar_features
         # concat dim60 cols
         dim60_x = []
         scale_ix = 0
-        for group_ix in range((self.num_seq_inputs)):
-            origin_x = seq_features[:, group_ix, :] # (batch, 60)
+        for group_ix in range((self.input_series_num)):
+            origin_x = series_features[:, group_ix, :] # (batch, 60)
             x = self.feature_scale[scale_ix](origin_x)  # (batch, 60)
             scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
@@ -127,10 +140,10 @@ class pao_model(modulus.Module):
             # x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
             # dim60_x.append(x_diff_diff)
 
-        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.num_seq_features)
+        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.num_series_features)
         position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
         position = self.positional_encoding(position)  # (batch, 60, 128)
-        x = self.input_linear(x)  # (batch, seq_len, 128)
+        x = self.input_linear(x)  # (batch, series_len, 128)
         x = x + position
         # other cols
         scalar_x = scalar_features  # (batch, 19)
@@ -139,25 +152,32 @@ class pao_model(modulus.Module):
         for i in range(60):
             scalar_x_list.append(self.other_feats_proj[i](scalar_x))
         scalar_x = torch.stack(scalar_x_list, dim=1)  # (batch, 60, hidden)
-        # repeat to match seq_len
-        # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, seq_len, hidden)
+        # repeat to match series_len
+        # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, series_len, hidden)
         # concat
         x = torch.cat([x, scalar_x], dim=2)  # (batch, 60, hidden*2)
-        x = self.seq_layer_norm(x)
+        x = self.series_layer_norm(x)
 
-        x = x.transpose(1, 2)  # (batch, hidden, seq_len)
-        x = self.cnn1(x)  # (batch, hidden, seq_len)
+        x = x.transpose(1, 2)  # (batch, hidden, series_len)
+        x = self.cnn1(x)  # (batch, hidden, series_len)
         x = x.transpose(1, 2)
-        x, _ = self.lstm(x)  # (batch, seq_len, hidden)
+        x, _ = self.lstm(x)  # (batch, series_len, hidden)
 
-        seq_output = self.seq_output_mlp(x)  # (batch, seq_len, n_targets)
-        # seq_diff_output = seq_output[:, :, self.num_seq_targets:]
-        # seq_output = seq_output[:, :, :self.num_seq_targets]
+        series_output = self.series_output_mlp(x)  # (batch, series_len, n_targets)
+        # series_diff_output = series_output[:, :, self.target_series_num:]
+        # series_output = series_output[:, :, :self.target_series_num]
         x = x.reshape(x.size(0), -1)
         x = self.scalar_layer_norm(x)
         scalar_output = self.scalar_output_mlp(x)
-
-        return seq_output, scalar_output
+        y = self.reshape_output(series_output, scalar_output)
+        if self.output_prune:
+            # Zeyuan says that the .clone() and .clone().zero_() helped bypass a torchscript issue. Reason unclear.
+            y = y.clone()
+            y[:, 60:60+self.strato_lev_out] = y[:, 60:60+self.strato_lev_out].clone().zero_()
+            y[:, 120:120+self.strato_lev_out] = y[:, 120:120+self.strato_lev_out].clone().zero_()
+            y[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
+            y[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
+        return y
 
 if __name__ == '__main__':
     model = pao_model()

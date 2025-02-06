@@ -20,8 +20,8 @@ from modulus.launch.logging import (
 from climsim_utils.data_utils import *
 from dataset_train import dataset_train
 from dataset_val import dataset_val
-from pao_model import pao_model
 
+from pao_model import pao_model
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
@@ -42,6 +42,11 @@ def main(cfg: DictConfig) -> float:
     input_min = xr.open_dataset(cfg.input_min)
     output_scale = xr.open_dataset(cfg.output_scale)
 
+
+
+
+
+
     lbd_qn = np.loadtxt(cfg.qn_lbd, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 
@@ -59,8 +64,6 @@ def main(cfg: DictConfig) -> float:
         data.set_to_v2_vars()
     elif cfg.variable_subsets == 'v2_dyn':
         data.set_to_v2_dyn_vars()
-    elif cfg.variable_subsets == 'v2_rh':
-        data.set_to_v2_rh_vars()
     elif cfg.variable_subsets == 'v3':
         data.set_to_v3_vars()
     elif cfg.variable_subsets == 'v4':
@@ -77,10 +80,11 @@ def main(cfg: DictConfig) -> float:
 
     input_sub, input_div, out_scale = data.save_norm(save_path = '.', write=True)
 
-    val_input_path = cfg.val_input
-    val_target_path = cfg.val_target
-    if not os.path.exists(cfg.val_input):
-        raise ValueError('Validation input path does not exist')
+
+    val_input_path = os.path.join(cfg.data_path, cfg.val_input)
+    val_target_path = os.path.join(cfg.data_path, cfg.val_target)
+    if not os.path.exists(val_input_path) or not os.path.exists(val_target_path):
+        raise ValueError('Validation path does not exist')
 
     train_dataset = dataset_train(parent_path = cfg.data_path, 
                                     input_sub = input_sub, 
@@ -99,13 +103,12 @@ def main(cfg: DictConfig) -> float:
                                     input_clip_rhonly = cfg.input_clip_rhonly)
             
     train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
-    
     train_loader = DataLoader(train_dataset, 
                                 batch_size=cfg.batch_size, 
                                 shuffle=False if dist.distributed else True,
                                 sampler=train_sampler,
-                                pin_memory=True,
                                 drop_last=True,
+                                pin_memory=torch.cuda.is_available(),
                                 num_workers=cfg.num_workers)
 
     val_dataset = dataset_val(input_paths = val_input_path, 
@@ -129,19 +132,23 @@ def main(cfg: DictConfig) -> float:
     val_loader = DataLoader(val_dataset, 
                             batch_size=cfg.batch_size, 
                             shuffle=False,
-                            pin_memory=True,
-                            drop_last=False,
                             sampler=val_sampler,
                             num_workers=cfg.num_workers)
                               
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
+
+    # TO DO: CHECK WHICH OF THESE ARE RELEVANT
+
+    # tmp_output_prune = cfg.output_prune
+    # tmp_strato_lev_out = cfg.strato_lev_out
+
     model = pao_model(
-            num_seq_inputs = cfg.num_seq_inputs,
-            num_scalar_inputs = cfg.num_scalar_inputs,
-            num_seq_targets = cfg.num_seq_targets,
-            num_scalar_targets = cfg.num_scalar_targets,
+            num_seq_inputs = data.input_series_num,
+            num_scalar_inputs = data.input_scalar_num,
+            num_seq_targets = data.target_series_num,
+            num_scalar_targets = data.target_scalar_num,
             num_hidden_seq = cfg.num_hidden_seq,
             num_hidden_scalar = cfg.num_hidden_scalar,
             ).to(dist.device)
@@ -213,39 +220,6 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Loss function not implemented')
     mse_criterion = nn.MSELoss()
     mae_criterion = nn.L1Loss()
-
-    def loss_weighted(pred, target):
-        if cfg.variable_subsets in ['v1','v1_dyn']:
-            raise ValueError('Weighted loss not implemented for v1/v1_dyn')
-        # dt_weight = 1.0
-        # dq1_weight = 1.0
-        # dq2_weight = 1.0
-        # dq3_weight = 1.0
-        # du_weight = 1.0
-        # dv_weight = 1.0
-        # d2d_weight = 1.0
-
-        # pred should be of shape (batch_size, 368)
-        # target should be of shape (batch_size, 368)
-        # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
-        #only do the calculation if any of the weights are not 1.0
-        if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
-            return criterion(pred, target)
-        pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
-        pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
-        pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
-        pred[:,180:240] = pred[:,180:240] * cfg.dq3_weight
-        pred[:,240:300] = pred[:,240:300] * cfg.du_weight
-        pred[:,300:360] = pred[:,300:360] * cfg.dv_weight
-        pred[:,360:368] = pred[:,360:368] * cfg.d2d_weight
-        target[:,0:60] = target[:,0:60] * cfg.dt_weight
-        target[:,60:120] = target[:,60:120] * cfg.dq1_weight
-        target[:,120:180] = target[:,120:180] * cfg.dq2_weight
-        target[:,180:240] = target[:,180:240] * cfg.dq3_weight
-        target[:,240:300] = target[:,240:300] * cfg.du_weight
-        target[:,300:360] = target[:,300:360] * cfg.dv_weight
-        target[:,360:368] = target[:,360:368] * cfg.d2d_weight
-        return criterion(pred, target)
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
@@ -310,8 +284,8 @@ def main(cfg: DictConfig) -> float:
         optim=optimizer,
     )
     def training_step(model, data_input, target):
-        output = model(data_input)
-        loss = loss_weighted(output, target)
+        pred = model(data_input)
+        loss = criterion(pred, target)
         return loss
 
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
@@ -324,16 +298,23 @@ def main(cfg: DictConfig) -> float:
         if dist.distributed:
             train_sampler.set_epoch(epoch)
 
-        with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=cfg.mini_batch_log_freq) as launchlog:
+        with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=10) as launchlog:
+            model.train()
+
+            total_iterations = len(train_loader)
 
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
             for data_input, target in train_loop:
                 if cfg.early_stop_step > 0 and current_step > cfg.early_stop_step:
                     break
-                data_input, target = data_input.to(device), target.to(device)
 
-                loss = training_step(model, data_input, target)
+                data_input, target = data_input.to(device), target.to(device)
+                optimizer.zero_grad()
+                output = model(data_input)
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
 
                 launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
                 # Update the progress bar description with the current loss
@@ -341,6 +322,7 @@ def main(cfg: DictConfig) -> float:
                 train_loop.set_postfix(loss=loss.item())
                 current_step += 1
             
+            model.eval()
             val_loss = 0.0
             val_mse = 0.0
             val_mae = 0.0
@@ -355,7 +337,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 output = eval_step_forward(model, data_input)
-                loss = loss_weighted(output, target)
+                loss = criterion(output, target)
                 mse = mse_criterion(output, target)
                 mae = mae_criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
