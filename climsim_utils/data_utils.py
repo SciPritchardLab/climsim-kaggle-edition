@@ -11,36 +11,7 @@ import copy
 import string
 import h5py
 from tqdm import tqdm
-from typing import Literal
-
-MLBackendType = Literal["tensorflow", "pytorch"]
-
-def eliq(T):
-    """
-    Function taking temperature (in K) and outputting liquid saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
-                              0.206739458e-7,0.302950461e-5,0.264847430e-3,
-                              0.142986287e-1,0.443987641,6.11239921]);
-    c_liq = -80
-    T0 = 273.16
-    return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
-
-def eice(T):
-    """
-    Function taking temperature (in K) and outputting ice saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
-                      0.602588177e-7,0.615021634e-5,0.420895665e-3,
-                      0.188439774e-1,0.503160820,6.11147274]);
-    c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
-    T0 = 273.16
-    return (T>c_ice[0])*eliq(T)+\
-    (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
-    (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
-                       (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
+import zarr
 
 class data_utils:
     def __init__(self,
@@ -49,7 +20,7 @@ class data_utils:
                  input_max,
                  input_min,
                  output_scale,
-                 ml_backend: MLBackendType = "tensorflow",
+                 ml_backend = "tensorflow",
                  normalize = True,
                  input_abbrev = 'mli',
                  output_abbrev = 'mlo',
@@ -111,6 +82,33 @@ class data_utils:
                 self.successful_backend_import = True
             except ImportError:
                 raise ImportError("PyTorch is not installed.")
+
+    def eliq(T):
+        """
+        Function taking temperature (in K) and outputting liquid saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
+                                0.206739458e-7,0.302950461e-5,0.264847430e-3,
+                                0.142986287e-1,0.443987641,6.11239921]);
+        c_liq = -80
+        T0 = 273.16
+        return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
+
+    def eice(T):
+        """
+        Function taking temperature (in K) and outputting ice saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
+                        0.602588177e-7,0.615021634e-5,0.420895665e-3,
+                        0.188439774e-1,0.503160820,6.11147274]);
+        c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
+        T0 = 273.16
+        return (T>c_ice[0])*self.eliq(T)+\
+        (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
+        (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
+                        (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
         def find_keys(dictionary, value):
             keys = []
@@ -175,17 +173,6 @@ class data_utils:
                           'pbuf_SOLIN',
                           'pbuf_LHFLX',
                           'pbuf_SHFLX']
-        
-        self.v1_outputs = ['ptend_t',
-                           'ptend_q0001',
-                           'cam_out_NETSW',
-                           'cam_out_FLWDS',
-                           'cam_out_PRECSC',
-                           'cam_out_PRECC',
-                           'cam_out_SOLS',
-                           'cam_out_SOLL',
-                           'cam_out_SOLSD',
-                           'cam_out_SOLLD']
 
         self.v2_inputs = ['state_t',
                           'state_q0001',
@@ -218,6 +205,33 @@ class data_utils:
                           'state_rh',
                           'state_q0002',
                           'state_q0003',
+                          'state_u',
+                          'state_v',
+                          'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
+                          'pbuf_CH4',
+                          'pbuf_N2O',
+                          'state_ps',
+                          'pbuf_SOLIN',
+                          'pbuf_LHFLX',
+                          'pbuf_SHFLX',
+                          'pbuf_TAUX',
+                          'pbuf_TAUY',
+                          'pbuf_COSZRS',
+                          'cam_in_ALDIF',
+                          'cam_in_ALDIR',
+                          'cam_in_ASDIF',
+                          'cam_in_ASDIR',
+                          'cam_in_LWUP',
+                          'cam_in_ICEFRAC',
+                          'cam_in_LANDFRAC',
+                          'cam_in_OCNFRAC',
+                          'cam_in_SNOWHICE',
+                          'cam_in_SNOWHLAND']
+
+        self.v2_rh_mc_inputs = ['state_t',
+                          'state_rh',
+                          'state_qn',
+                          'liq_partition',
                           'state_u',
                           'state_v',
                           'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
@@ -336,15 +350,69 @@ class data_utils:
                             'cam_in_OCNFRAC',
                             'cam_in_SNOWHICE',
                             'cam_in_SNOWHLAND',
-                            'tm_state_ps',
-                            'tm_pbuf_SOLIN',
-                            'tm_pbuf_LHFLX',
-                            'tm_pbuf_SHFLX',
-                            'tm_pbuf_COSZRS',
+                            'tm_state_ps', # exclude -8
+                            'tm_pbuf_SOLIN', # exclude -7
+                            'tm_pbuf_LHFLX', # exclude -6
+                            'tm_pbuf_SHFLX', # exclude -5
+                            'tm_pbuf_COSZRS', # exclude -4 
                             'clat',
                             'slat',
-                            'icol',] 
-                
+                            'icol',] # exclude -1
+
+        self.v6_inputs = ['state_t',
+                            'state_rh',
+                            'state_qn',
+                            'liq_partition',
+                            'state_u',
+                            'state_v',
+                            'state_t_dyn',
+                            'state_q0_dyn',
+                            'state_u_dyn',
+                            'tm_state_t_dyn',
+                            'tm_state_q0_dyn',
+                            'tm_state_u_dyn',
+                            'state_t_prvphy',
+                            'state_q0001_prvphy',
+                            'state_qn_prvphy',
+                            'state_u_prvphy',
+                            'tm_state_t_prvphy',
+                            'tm_state_q0001_prvphy',
+                            'tm_state_qn_prvphy',
+                            'tm_state_u_prvphy',
+                            'pbuf_ozone',
+                            'pbuf_CH4',
+                            'pbuf_N2O',
+                            'state_ps',
+                            'pbuf_SOLIN',
+                            'pbuf_LHFLX',
+                            'pbuf_SHFLX',
+                            'pbuf_TAUX',
+                            'pbuf_TAUY',
+                            'pbuf_COSZRS',
+                            'cam_in_ALDIF',
+                            'cam_in_ALDIR',
+                            'cam_in_ASDIF',
+                            'cam_in_ASDIR',
+                            'cam_in_LWUP',
+                            'cam_in_ICEFRAC',
+                            'cam_in_LANDFRAC',
+                            'cam_in_OCNFRAC',
+                            'cam_in_SNOWHICE',
+                            'cam_in_SNOWHLAND',
+                            'clat',
+                            'slat',]
+
+        self.v1_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD']
+
         self.v2_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_q0002',
@@ -358,7 +426,21 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
+
+        self.v2_rh_mc_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
         
         self.v4_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -373,7 +455,7 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
         
         self.v5_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -387,7 +469,21 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
+
+        self.v6_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
 
         self.var_lens = {#inputs
                         'state_t':self.num_levels,
@@ -563,9 +659,13 @@ class data_utils:
         self.input_vars = self.v1_inputs
         self.target_vars = self.v1_outputs
         self.ps_index = 120
-        self.input_feature_len = 124
-        self.target_feature_len = 128
         self.full_vars = False
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 124
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
 
     def set_to_v2_vars(self):
         '''
@@ -575,9 +675,13 @@ class data_utils:
         self.input_vars = self.v2_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_vars(self):
         '''
@@ -587,9 +691,29 @@ class data_utils:
         self.input_vars = self.v2_rh_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+
+    def set_to_v2_rh_mc_vars(self):
+        '''
+        This function sets the inputs and outputs to the V2 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v2_rh_mc_inputs
+        self.target_vars = self.v2_rh_mc_outputs
+        self.ps_index = 360
+        self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def set_to_v4_vars(self):
         '''
@@ -599,9 +723,13 @@ class data_utils:
         self.input_vars = self.v4_inputs
         self.target_vars = self.v4_outputs
         self.ps_index = 1500
-        self.input_feature_len = 1525
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1525
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
     
     def set_to_v5_vars(self):
         '''
@@ -611,10 +739,32 @@ class data_utils:
         self.input_vars = self.v5_inputs
         self.target_vars = self.v5_outputs
         self.ps_index = 1380
-        self.input_feature_len = 1405
-        self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1405
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
+
+    def set_to_v6_vars(self):
+        '''
+        This function sets the inputs and outputs to the V6 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v6_inputs
+        self.target_vars = self.v6_outputs
+        self.ps_index = 1380
+        self.full_vars = False
+        self.full_vars_v5 = True
+        self.full_vars_v6 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def get_xrdata(self, file, file_vars = None):
         '''
@@ -630,7 +780,7 @@ class data_utils:
                 T00 = 253.16 # Temperature below which we use e_ice
                 omega = (tair - T00) / (T0 - T00)
                 omega = np.maximum( 0, np.minimum( 1, omega ))
-                esat =  omega * eliq(tair) + (1-omega) * eice(tair)
+                esat =  omega * self.eliq(tair) + (1-omega) * self.eice(tair)
                 Rd = 287 # Specific gas constant for dry air
                 Rv = 461 # Specific gas constant for water vapor    
                 qvs = (Rd*esat)/(Rv*ds['state_pmid'])
