@@ -11,6 +11,7 @@ import copy
 import string
 import h5py
 from tqdm import tqdm
+import zarr
 
 class data_utils:
     def __init__(self,
@@ -225,6 +226,33 @@ class data_utils:
                           'cam_in_LANDFRAC',
                           'cam_in_OCNFRAC',
                           'cam_in_SNOWHICE',
+                          'cam_in_SNOWHLAND']
+
+        self.v2_rh_mc_inputs = ['state_t',
+                          'state_rh',
+                          'state_qn',
+                          'liq_partition',
+                          'state_u',
+                          'state_v',
+                          'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
+                          'pbuf_CH4',
+                          'pbuf_N2O',
+                          'state_ps',
+                          'pbuf_SOLIN',
+                          'pbuf_LHFLX',
+                          'pbuf_SHFLX',
+                          'pbuf_TAUX',
+                          'pbuf_TAUY',
+                          'pbuf_COSZRS',
+                          'cam_in_ALDIF',
+                          'cam_in_ALDIR',
+                          'cam_in_ASDIF',
+                          'cam_in_ASDIR',
+                          'cam_in_LWUP',
+                          'cam_in_ICEFRAC',
+                          'cam_in_LANDFRAC',
+                          'cam_in_OCNFRAC',
+                          'cam_in_SNOWHICE',
                           'cam_in_SNOWHLAND'] 
                 
         self.v4_inputs = ['state_t',
@@ -389,6 +417,20 @@ class data_utils:
                            'ptend_q0001',
                            'ptend_q0002',
                            'ptend_q0003',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
+
+        self.v2_rh_mc_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
                            'ptend_u',
                            'ptend_v',
                            'cam_out_NETSW',
@@ -656,6 +698,22 @@ class data_utils:
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
         self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
         self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+
+    def set_to_v2_rh_mc_vars(self):
+        '''
+        This function sets the inputs and outputs to the V2 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v2_rh_mc_inputs
+        self.target_vars = self.v2_rh_mc_outputs
+        self.ps_index = 360
+        self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def set_to_v4_vars(self):
         '''
