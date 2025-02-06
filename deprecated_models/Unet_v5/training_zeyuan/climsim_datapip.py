@@ -18,16 +18,17 @@ class climsim_dataset(Dataset):
                  qinput_prune, 
                  output_prune, 
                  strato_lev,
-                 qc_lbd,
-                 qi_lbd, 
+                 strato_lev_out,
+                 qn_lbd,
                  decouple_cloud=False, 
                  aggressive_pruning=False,
-                 strato_lev_qc=30,
+                #  strato_lev_qc=30,
                  strato_lev_qinput=None, 
                  strato_lev_tinput=None,
-                 strato_lev_out = 12,
                  input_clip=False,
-                 input_clip_rhonly=False,):
+                 input_clip_rhonly=False,
+                 qn_tscaled=False,
+                 qn_logtransform=False):
         """
         Args:
             input_paths (str): Path to the .npy file containing the inputs.
@@ -51,12 +52,10 @@ class climsim_dataset(Dataset):
         self.qinput_prune = qinput_prune
         self.output_prune = output_prune
         self.strato_lev = strato_lev
-        self.qc_lbd = qc_lbd
-        self.qi_lbd = qi_lbd
+        self.strato_lev_out = strato_lev_out
+        self.qn_lbd = qn_lbd
         self.decouple_cloud = decouple_cloud
         self.aggressive_pruning = aggressive_pruning
-        self.strato_lev_qc = strato_lev_qc
-        self.strato_lev_out = strato_lev_out
         self.input_clip = input_clip
         if strato_lev_qinput <0:
             self.strato_lev_qinput = strato_lev
@@ -64,10 +63,29 @@ class climsim_dataset(Dataset):
             self.strato_lev_qinput = strato_lev_qinput
         self.strato_lev_tinput = strato_lev_tinput
         self.input_clip_rhonly = input_clip_rhonly
+        self.qn_tscaled = qn_tscaled
+        self.qn_logtransform = qn_logtransform
 
         if self.strato_lev_qinput <self.strato_lev:
             raise ValueError('strato_lev_qinput should be greater than or equal to strato_lev, otherwise inconsistent with E3SM')
 
+    def t_scaled_weight(self, t):
+        # Polynomial coefficients
+        a = 1.043084e-12
+        b = -4.028800e-10
+        c = 4.128325e-08
+        # Evaluate polynomial
+        y = a * t**2 + b * t + c
+        # Set the boundary values
+        t_min = 190
+        t_max = 290
+        # Polynomial values at the boundaries
+        y_min = 2.39141e-09  #a * t_min**2 + b * t_min + c
+        y_max = 1.21714e-08 #a * t_max**2 + b * t_max + c
+        # Apply boundary conditions using np.where
+        y = np.where(t < t_min, y_min, y)
+        y = np.where(t > t_max, y_max, y)
+        return y_max/y
 
     def __len__(self):
         return len(self.inputs)
@@ -75,28 +93,29 @@ class climsim_dataset(Dataset):
     def __getitem__(self, idx):
         x = self.inputs[idx]
         y = self.targets[idx]
-        # x = np.load(self.input_paths,mmap_mode='r')[idx]
-        # y = np.load(self.target_paths,mmap_mode='r')[idx]
-        x[120:180] = 1 - np.exp(-x[120:180] * self.qc_lbd)
-        x[180:240] = 1 - np.exp(-x[180:240] * self.qi_lbd)
-        # Avoid division by zero in input_div and set corresponding x to 0
-        # input_div_nonzero = self.input_div != 0
-        # x = np.where(input_div_nonzero, (x - self.input_sub) / self.input_div, 0)
+
+        if self.qn_tscaled:
+            # use temperature to generate weights for scaling qn
+            qn_scale_weight = self.t_scaled_weight(x[0:60])
+
+        if not self.qn_logtransform:
+            x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
         x = (x - self.input_sub) / self.input_div
-        #make all inf and nan values 0
+
         x[np.isnan(x)] = 0
         x[np.isinf(x)] = 0
 
         y = y * self.out_scale
         if self.decouple_cloud:
-            x[120:240] = 0
-            x[60*14:60*16] =0
-            x[60*19:60*21] =0
-        elif self.aggressive_pruning:
+            x[120:180] = 0
+            x[60*14:60*15] =0
+            x[60*18:60*19] =0
+
+        if self.aggressive_pruning:
             # for profiles, only keep stratosphere temperature. prune all other profiles in stratosphere
             x[60:60+self.strato_lev_qinput] = 0 # prune RH
-            x[120:120+self.strato_lev_qc] = 0
-            x[180:180+self.strato_lev_qinput] = 0
+            x[120:120+self.strato_lev_qinput] = 0
+            # x[180:180+self.strato_lev] = 0 # should be liq_partition
             x[240:240+self.strato_lev] = 0 # prune u
             x[300:300+self.strato_lev] = 0 # prune v
             x[360:360+self.strato_lev] = 0
@@ -106,20 +125,19 @@ class climsim_dataset(Dataset):
             x[600:600+self.strato_lev] = 0
             x[660:660+self.strato_lev] = 0
             x[720:720+self.strato_lev] = 0
-            x[780:780+self.strato_lev_qinput] = 0
-            x[840:840+self.strato_lev_qc] = 0 # prune qc_phy
-            x[900:900+self.strato_lev_qinput] = 0
+            x[780:780+self.strato_lev_qinput] = 0 # prune qv_phy
+            x[840:840+self.strato_lev_qinput] = 0 # prune qn_phy
+            x[900:900+self.strato_lev] = 0
             x[960:960+self.strato_lev] = 0
-            x[1020:1020+self.strato_lev] = 0
-            x[1080:1080+self.strato_lev_qinput] = 0
-            x[1140:1140+self.strato_lev_qc] = 0 # prune qc_phy in previous time step
-            x[1200:1200+self.strato_lev_qinput] = 0
-            x[1260:1260+self.strato_lev] = 0
-            x[1515] = 0 #SNOWHICE
+            x[1020:1020+self.strato_lev_qinput] = 0 # prune qv_phy
+            x[1080:1080+self.strato_lev_qinput] = 0 # prune qn_phy in previous time step
+            x[1140:1140+self.strato_lev] = 0
+            x[1395] = 0 #SNOWHICE
         elif self.qinput_prune:
+            #raise NotImplementedError('should use aggressive_pruning! instead of qinput_prune!')
             # x[:,60:60+self.strato_lev] = 0
             x[120:120+self.strato_lev] = 0
-            x[180:180+self.strato_lev] = 0
+            # x[180:180+self.strato_lev] = 0
 
         if self.strato_lev_tinput >0:
             x[0:self.strato_lev_tinput] = 0
@@ -130,7 +148,7 @@ class climsim_dataset(Dataset):
             else:
                 x[60:120] = np.clip(x[60:120], 0, 1.2) # for RH, clip to (0,1.2)
                 x[360:720] = np.clip(x[360:720], -0.5, 0.5) # for dyn forcing, clip to (-0.5,0.5)
-                x[720:1320] = np.clip(x[720:1320], -3, 3) # for phy tendencies  clip to (-3,3)
+                x[720:1200] = np.clip(x[720:1200], -3, 3) # for phy tendencies  clip to (-3,3)
 
         
         if self.output_prune:
@@ -138,5 +156,8 @@ class climsim_dataset(Dataset):
             y[120:120+self.strato_lev_out] = 0
             y[180:180+self.strato_lev_out] = 0
             y[240:240+self.strato_lev_out] = 0
-            y[300:300+self.strato_lev_out] = 0
-        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+
+        if self.qn_tscaled:
+            return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32), torch.tensor(qn_scale_weight, dtype=torch.float32)
+        else:
+            return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)

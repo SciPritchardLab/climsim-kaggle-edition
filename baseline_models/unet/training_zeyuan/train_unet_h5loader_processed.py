@@ -19,8 +19,8 @@ from modulus.launch.logging import (
 )
 from climsim_utils.data_utils import *
 
-from climsim_datapip import climsim_dataset
-from climsim_datapip_h5 import climsim_dataset_h5
+from climsim_datapip_processed import climsim_dataset_processed
+from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
 from climsim_unet import ClimsimUnet
 import climsim_unet as climsim_unet
 import hydra
@@ -28,6 +28,19 @@ from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
+import random
+
+torch.set_float32_matmul_precision("high")
+# Set a fixed seed value
+seed = 43
+# For PyTorch
+torch.manual_seed(seed)
+# For CUDA if using GPU
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)  # if using multi-GPU
+# For other libraries
+np.random.seed(seed)
+random.seed(seed)
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -66,6 +79,8 @@ def main(cfg: DictConfig) -> float:
         data.set_to_v2_dyn_vars()
     elif cfg.variable_subsets == 'v2_rh':
         data.set_to_v2_rh_vars()
+    elif cfg.variable_subsets == 'v2_rh_mc':
+        data.set_to_v2_rh_mc_vars()
     elif cfg.variable_subsets == 'v3':
         data.set_to_v3_vars()
     elif cfg.variable_subsets == 'v4':
@@ -106,9 +121,7 @@ def main(cfg: DictConfig) -> float:
     #     dataset_class = climsim_dataset
     
     #train_dataset = dataset_class(train_input_path, train_target_path, input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, cfg.strato_lev, lbd_qc, lbd_qi)
-    val_dataset = climsim_dataset(val_input_path, val_target_path, input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, \
-                                  cfg.strato_lev, lbd_qc, lbd_qi, cfg.decouple_cloud, cfg.aggressive_pruning, \
-                                    cfg.strato_lev_qc, cfg.strato_lev_qinput, cfg.strato_lev_tinput, cfg.strato_lev_out, cfg.input_clip, cfg.input_clip_rhonly)
+    val_dataset = climsim_dataset_processed(val_input_path, val_target_path, cfg.output_prune, cfg.strato_lev_out)
 
     #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
     val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
@@ -118,10 +131,7 @@ def main(cfg: DictConfig) -> float:
                             sampler=val_sampler,
                             num_workers=cfg.num_workers)
     
-    train_dataset = climsim_dataset_h5(cfg.data_path, \
-                                    input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, \
-                                        cfg.strato_lev, lbd_qc, lbd_qi, cfg.decouple_cloud, cfg.aggressive_pruning, \
-                                            cfg.strato_lev_qc, cfg.strato_lev_qinput, cfg.strato_lev_tinput, cfg.strato_lev_out, cfg.input_clip, cfg.input_clip_rhonly)
+    train_dataset = climsim_dataset_processed_h5(cfg.data_path, cfg.output_prune, cfg.strato_lev_out)
             
     train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
     
