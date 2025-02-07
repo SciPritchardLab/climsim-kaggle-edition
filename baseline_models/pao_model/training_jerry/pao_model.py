@@ -112,14 +112,14 @@ class pao_model(modulus.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def forward(self, x):
-        x = self.reshape_input(x)
+        series_inputs, scalar_inputs = self.reshape_input(x)
         # create series_features
         # create scalar_features
         # concat dim60 cols
         dim60_x = []
         scale_ix = 0
         for group_ix in range((self.input_series_num)):
-            origin_x = series_features[:, group_ix, :] # (batch, 60)
+            origin_x = series_inputs[:, group_ix, :] # (batch, 60)
             x = self.feature_scale[scale_ix](origin_x)  # (batch, 60)
             scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
@@ -140,7 +140,7 @@ class pao_model(modulus.Module):
             # x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
             # dim60_x.append(x_diff_diff)
 
-        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.num_series_features)
+        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.input_series_num)
         position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
         position = self.positional_encoding(position)  # (batch, 60, 128)
         x = self.input_linear(x)  # (batch, series_len, 128)
