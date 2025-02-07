@@ -44,9 +44,6 @@ def main(cfg: DictConfig) -> float:
 
 
 
-
-
-
     lbd_qn = np.loadtxt(cfg.qn_lbd, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 

@@ -12,32 +12,6 @@ import string
 import h5py
 from tqdm import tqdm
 import zarr
-def eliq(T):
-    """
-    Function taking temperature (in K) and outputting liquid saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
-                              0.206739458e-7,0.302950461e-5,0.264847430e-3,
-                              0.142986287e-1,0.443987641,6.11239921]);
-    c_liq = -80
-    T0 = 273.16
-    return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
-
-def eice(T):
-    """
-    Function taking temperature (in K) and outputting ice saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
-                      0.602588177e-7,0.615021634e-5,0.420895665e-3,
-                      0.188439774e-1,0.503160820,6.11147274]);
-    c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
-    T0 = 273.16
-    return (T>c_ice[0])*eliq(T)+\
-    (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
-    (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
-                       (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
 class data_utils:
     def __init__(self,
@@ -46,20 +20,15 @@ class data_utils:
                  input_max,
                  input_min,
                  output_scale,
-                 qinput_log,
+                 ml_backend = "tensorflow",
                  normalize = True,
-                 input_abbrev = 'mlis',
-                 output_abbrev = 'mlos',
-                 save_zarr=False,
+                 input_abbrev = 'mli',
+                 output_abbrev = 'mlo',
                  save_h5=False,
-                 save_npy=True,
-                 cpuonly=False):
-        if cpuonly:
-            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+                 save_npy=True):
         self.input_abbrev = input_abbrev
         self.output_abbrev = output_abbrev
         self.data_path = None
-        self.save_zarr = save_zarr
         self.save_h5 = save_h5
         self.save_npy = save_npy
         self.input_vars = []
@@ -87,7 +56,59 @@ class data_utils:
         self.sort_lat_key = np.argsort(self.grid_info['lat'].values[np.sort(self.lats_indices)])
         self.sort_lon_key = np.argsort(self.grid_info['lon'].values[np.sort(self.lons_indices)])
         self.indextolatlon = {i: (self.grid_info['lat'].values[i%self.num_latlon], self.grid_info['lon'].values[i%self.num_latlon]) for i in range(self.num_latlon)}
-        self.qinput_log = qinput_log
+        
+        self.ml_backend = ml_backend
+        self.tf = None
+        self.torch = None
+
+        if self.ml_backend == "tensorflow":
+            self.successful_backend_import = False
+
+            try:
+                import tensorflow as tf
+
+                self.tf = tf
+                self.successful_backend_import = True
+            except ImportError:
+                raise ImportError("Tensorflow is not installed.")
+
+        elif self.ml_backend == "pytorch":
+            self.successful_backend_import = False
+
+            try:
+                import torch
+
+                self.torch = torch
+                self.successful_backend_import = True
+            except ImportError:
+                raise ImportError("PyTorch is not installed.")
+
+    def eliq(T):
+        """
+        Function taking temperature (in K) and outputting liquid saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
+                                0.206739458e-7,0.302950461e-5,0.264847430e-3,
+                                0.142986287e-1,0.443987641,6.11239921]);
+        c_liq = -80
+        T0 = 273.16
+        return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
+
+    def eice(T):
+        """
+        Function taking temperature (in K) and outputting ice saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
+                        0.602588177e-7,0.615021634e-5,0.420895665e-3,
+                        0.188439774e-1,0.503160820,6.11147274]);
+        c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
+        T0 = 273.16
+        return (T>c_ice[0])*self.eliq(T)+\
+        (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
+        (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
+                        (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
         def find_keys(dictionary, value):
             keys = []
@@ -153,63 +174,12 @@ class data_utils:
                           'pbuf_LHFLX',
                           'pbuf_SHFLX']
 
-        self.v1_dyn_inputs = ['state_t',
-                              'state_q0001',
-                              'state_t_dyn',
-                              'state_q0_dyn',
-                              'state_ps',
-                              'pbuf_SOLIN',
-                              'pbuf_LHFLX',
-                              'pbuf_SHFLX']
-        
-        self.v1_outputs = ['ptend_t',
-                           'ptend_q0001',
-                           'cam_out_NETSW',
-                           'cam_out_FLWDS',
-                           'cam_out_PRECSC',
-                           'cam_out_PRECC',
-                           'cam_out_SOLS',
-                           'cam_out_SOLL',
-                           'cam_out_SOLSD',
-                           'cam_out_SOLLD']
-
         self.v2_inputs = ['state_t',
                           'state_q0001',
                           'state_q0002',
                           'state_q0003',
                           'state_u',
                           'state_v',
-                          'state_ps',
-                          'pbuf_SOLIN',
-                          'pbuf_LHFLX',
-                          'pbuf_SHFLX',
-                          'pbuf_TAUX',
-                          'pbuf_TAUY',
-                          'pbuf_COSZRS',
-                          'cam_in_ALDIF',
-                          'cam_in_ALDIR',
-                          'cam_in_ASDIF',
-                          'cam_in_ASDIR',
-                          'cam_in_LWUP',
-                          'cam_in_ICEFRAC',
-                          'cam_in_LANDFRAC',
-                          'cam_in_OCNFRAC',
-                          'cam_in_SNOWHICE',
-                          'cam_in_SNOWHLAND',
-                          'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
-                          'pbuf_CH4',
-                          'pbuf_N2O'] 
-
-        self.v2_dyn_inputs = ['state_t',
-                          'state_q0001',
-                          'state_q0002',
-                          'state_q0003',
-                          'state_u',
-                          'state_v',
-                          'state_t_dyn',
-                          'state_q0_dyn',
-                          'state_u_dyn',
-                          'state_v_dyn',
                           'state_ps',
                           'pbuf_SOLIN',
                           'pbuf_LHFLX',
@@ -256,8 +226,8 @@ class data_utils:
                           'cam_in_LANDFRAC',
                           'cam_in_OCNFRAC',
                           'cam_in_SNOWHICE',
-                          'cam_in_SNOWHLAND'] 
-        
+                          'cam_in_SNOWHLAND']
+
         self.v2_rh_mc_inputs = ['state_t',
                           'state_rh',
                           'state_qn',
@@ -283,8 +253,8 @@ class data_utils:
                           'cam_in_LANDFRAC',
                           'cam_in_OCNFRAC',
                           'cam_in_SNOWHICE',
-                          'cam_in_SNOWHLAND'] 
-                
+                          'cam_in_SNOWHLAND']
+
         self.v3_inputs = ['state_t',
                           'state_q0001',
                           'state_q0002',
@@ -313,8 +283,8 @@ class data_utils:
                           'cam_in_LANDFRAC',
                           'cam_in_OCNFRAC',
                           'cam_in_SNOWHICE',
-                          'cam_in_SNOWHLAND',] 
-    
+                          'cam_in_SNOWHLAND',]  
+                
         self.v4_inputs = ['state_t',
                             'state_rh',
                             'state_q0002',
@@ -410,15 +380,69 @@ class data_utils:
                             'cam_in_OCNFRAC',
                             'cam_in_SNOWHICE',
                             'cam_in_SNOWHLAND',
-                            'tm_state_ps',
-                            'tm_pbuf_SOLIN',
-                            'tm_pbuf_LHFLX',
-                            'tm_pbuf_SHFLX',
-                            'tm_pbuf_COSZRS',
+                            'tm_state_ps', # exclude -8
+                            'tm_pbuf_SOLIN', # exclude -7
+                            'tm_pbuf_LHFLX', # exclude -6
+                            'tm_pbuf_SHFLX', # exclude -5
+                            'tm_pbuf_COSZRS', # exclude -4 
                             'clat',
                             'slat',
-                            'icol',] 
-                
+                            'icol',] # exclude -1
+
+        self.v6_inputs = ['state_t',
+                            'state_rh',
+                            'state_qn',
+                            'liq_partition',
+                            'state_u',
+                            'state_v',
+                            'state_t_dyn',
+                            'state_q0_dyn',
+                            'state_u_dyn',
+                            'tm_state_t_dyn',
+                            'tm_state_q0_dyn',
+                            'tm_state_u_dyn',
+                            'state_t_prvphy',
+                            'state_q0001_prvphy',
+                            'state_qn_prvphy',
+                            'state_u_prvphy',
+                            'tm_state_t_prvphy',
+                            'tm_state_q0001_prvphy',
+                            'tm_state_qn_prvphy',
+                            'tm_state_u_prvphy',
+                            'pbuf_ozone',
+                            'pbuf_CH4',
+                            'pbuf_N2O',
+                            'state_ps',
+                            'pbuf_SOLIN',
+                            'pbuf_LHFLX',
+                            'pbuf_SHFLX',
+                            'pbuf_TAUX',
+                            'pbuf_TAUY',
+                            'pbuf_COSZRS',
+                            'cam_in_ALDIF',
+                            'cam_in_ALDIR',
+                            'cam_in_ASDIF',
+                            'cam_in_ASDIR',
+                            'cam_in_LWUP',
+                            'cam_in_ICEFRAC',
+                            'cam_in_LANDFRAC',
+                            'cam_in_OCNFRAC',
+                            'cam_in_SNOWHICE',
+                            'cam_in_SNOWHLAND',
+                            'clat',
+                            'slat',]
+
+        self.v1_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD']
+
         self.v2_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_q0002',
@@ -432,8 +456,8 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
-        
+                           'cam_out_SOLLD',]
+
         self.v2_rh_mc_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_qn',
@@ -446,8 +470,8 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
-        
+                           'cam_out_SOLLD',]
+
         self.v3_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_q0002',
@@ -476,7 +500,7 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
         
         self.v5_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -490,7 +514,21 @@ class data_utils:
                            'cam_out_SOLS',
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
-                           'cam_out_SOLLD']
+                           'cam_out_SOLLD',]
+
+        self.v6_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
 
         self.var_lens = {#inputs
                         'state_t':self.num_levels,
@@ -666,21 +704,13 @@ class data_utils:
         self.input_vars = self.v1_inputs
         self.target_vars = self.v1_outputs
         self.ps_index = 120
-        self.input_feature_len = 124
-        self.target_feature_len = 128
         self.full_vars = False
-
-    def set_to_v1_dyn_vars(self):
-        '''
-        This function sets the inputs and outputs to the V1_dyn subset.
-        It also indicates the index of the surface pressure variable.
-        '''
-        self.input_vars = self.v1_dyn_inputs
-        self.target_vars = self.v1_outputs
-        self.ps_index = 240
-        self.input_feature_len = 244
-        self.target_feature_len = 128
-        self.full_vars = False
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 124
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
 
     def set_to_v2_vars(self):
         '''
@@ -690,9 +720,13 @@ class data_utils:
         self.input_vars = self.v2_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_vars(self):
         '''
@@ -702,9 +736,13 @@ class data_utils:
         self.input_vars = self.v2_rh_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_mc_vars(self):
         '''
@@ -714,58 +752,64 @@ class data_utils:
         self.input_vars = self.v2_rh_mc_inputs
         self.target_vars = self.v2_rh_mc_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 308
         self.full_vars = True
-
-    def set_to_v2_dyn_vars(self):
-        '''
-        This function sets the inputs and outputs to the V2_dyn subset.
-        It also indicates the index of the surface pressure variable.
-        '''
-        self.input_vars = self.v2_dyn_inputs
-        self.target_vars = self.v2_outputs
-        self.ps_index = 600
-        self.input_feature_len = 797
-        self.target_feature_len = 368
-        self.full_vars = True
-
-    def set_to_v3_vars(self):
-        '''
-        This function sets the inputs and outputs to the V3 subset.
-        It also indicates the index of the surface pressure variable.
-        '''
-        self.input_vars = self.v3_inputs
-        self.target_vars = self.v3_outputs
-        self.ps_index = 720
-        self.input_feature_len = 737
-        self.target_feature_len = 368
-        self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def set_to_v4_vars(self):
         '''
-        This function sets the inputs and outputs to the V3 subset.
+        This function sets the inputs and outputs to the V4 subset.
         It also indicates the index of the surface pressure variable.
         '''
         self.input_vars = self.v4_inputs
         self.target_vars = self.v4_outputs
         self.ps_index = 1500
-        self.input_feature_len = 1525 #737+788
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1525
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
     
     def set_to_v5_vars(self):
         '''
-        This function sets the inputs and outputs to the V3 subset.
+        This function sets the inputs and outputs to the V5 subset.
         It also indicates the index of the surface pressure variable.
         '''
         self.input_vars = self.v5_inputs
         self.target_vars = self.v5_outputs
         self.ps_index = 1380
-        self.input_feature_len = 1405 #737+788 - 120
-        self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1405
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
+
+    def set_to_v6_vars(self):
+        '''
+        This function sets the inputs and outputs to the V6 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v6_inputs
+        self.target_vars = self.v6_outputs
+        self.ps_index = 1380
+        self.full_vars = False
+        self.full_vars_v5 = True
+        self.full_vars_v6 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def get_xrdata(self, file, file_vars = None):
         '''
@@ -781,7 +825,7 @@ class data_utils:
                 T00 = 253.16 # Temperature below which we use e_ice
                 omega = (tair - T00) / (T0 - T00)
                 omega = np.maximum( 0, np.minimum( 1, omega ))
-                esat =  omega * eliq(tair) + (1-omega) * eice(tair)
+                esat =  omega * self.eliq(tair) + (1-omega) * self.eice(tair)
                 Rd = 287 # Specific gas constant for dry air
                 Rv = 461 # Specific gas constant for water vapor    
                 qvs = (Rd*esat)/(Rv*ds['state_pmid'])
@@ -795,6 +839,7 @@ class data_utils:
                 icol[:] = np.arange(1,385)
                 ds['icol'] = icol
             
+            # if "liq_partition" is in file_vars but not in ds, then add it to ds
             if 'liq_partition' in file_vars and 'liq_partition' not in ds:
                 tair = ds['state_t']
                 T0 = 273.16 # Freezing temperature in standard conditions
@@ -803,21 +848,24 @@ class data_utils:
                 liq_partition = np.maximum( 0, np.minimum( 1, liq_partition ))
                 ds['liq_partition'] = liq_partition
             
+            # if "state_qn" is in file_vars but not in ds, then add it to ds
             if 'state_qn' in file_vars and 'state_qn' not in ds:
                 state_qn = ds['state_q0002'] + ds['state_q0003']
                 ds['state_qn'] = state_qn
 
+            # if "state_qn_prvphy" is in file_vars but not in ds, then add it to ds
             if 'state_qn_prvphy' in file_vars and 'state_qn_prvphy' not in ds:
                 state_qn_prvphy = ds['state_q0002_prvphy'] + ds['state_q0003_prvphy']
                 ds['state_qn_prvphy'] = state_qn_prvphy
 
+            # if "tm_state_qn_prvphy" is in file_vars but not in ds, then add it to ds
             if 'tm_state_qn_prvphy' in file_vars and 'tm_state_qn_prvphy' not in ds:
                 tm_state_qn_prvphy = ds['tm_state_q0002_prvphy'] + ds['tm_state_q0003_prvphy']
                 ds['tm_state_qn_prvphy'] = tm_state_qn_prvphy 
 
         if file_vars is not None:
             ds = ds[file_vars]
-        ds = ds.merge(self.grid_info[['lat','lon']], compat='override')
+        ds = ds.merge(self.grid_info[['lat','lon']], compat = 'override')
         ds = ds.where((ds['lat']>-999)*(ds['lat']<999), drop=True)
         ds = ds.where((ds['lon']>-999)*(ds['lon']<999), drop=True)
         return ds
@@ -836,30 +884,25 @@ class data_utils:
         tmp_input_vars = self.input_vars
         if 'state_q0001' not in input_file: 
             tmp_input_vars = tmp_input_vars + ['state_q0001']
-        if 'state_q0002' not in input_file:
+        if ('state_q0002' not in input_file) and (self.full_vars or self.full_vars_v5):
             tmp_input_vars = tmp_input_vars + ['state_q0002']
-        if 'state_q0003' not in input_file:
+        if ('state_q0003' not in input_file) and (self.full_vars or self.full_vars_v5):
             tmp_input_vars = tmp_input_vars + ['state_q0003']
-        
         ds_input = self.get_xrdata(input_file, tmp_input_vars)
-        # # read inputs
-        # if 'state_q0001' not in input_file: 
-        #     ds_input = self.get_xrdata(input_file, self.input_vars+['state_q0001'])
-        # else:
-        #     ds_input = self.get_input(input_file)
+        
         ds_target = self.get_xrdata(input_file.replace(f'.{self.input_abbrev}.',f'.{self.output_abbrev}.'))
         # each timestep is 20 minutes which corresponds to 1200 seconds
         ds_target['ptend_t'] = (ds_target['state_t'] - ds_input['state_t'])/1200 # T tendency [K/s]
-        ds_target['ptend_q0001'] = (ds_target['state_q0001'] - ds_input['state_q0001'])/1200 # Q tendency [kg/kg/s]
+        ds_target['ptend_q0001'] = (ds_target['state_q0001'] - ds_input['state_q0001'])/1200 # Q1 tendency [kg/kg/s]
         if self.full_vars:
-            ds_target['ptend_q0002'] = (ds_target['state_q0002'] - ds_input['state_q0002'])/1200 # Q tendency [kg/kg/s]
-            ds_target['ptend_q0003'] = (ds_target['state_q0003'] - ds_input['state_q0003'])/1200 # Q tendency [kg/kg/s]
+            ds_target['ptend_q0002'] = (ds_target['state_q0002'] - ds_input['state_q0002'])/1200 # Q2 tendency [kg/kg/s]
+            ds_target['ptend_q0003'] = (ds_target['state_q0003'] - ds_input['state_q0003'])/1200 # Q3 tendency [kg/kg/s]
             ds_target['ptend_u'] = (ds_target['state_u'] - ds_input['state_u'])/1200 # U tendency [m/s/s]
             ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200 # V tendency [m/s/s]   
         elif self.full_vars_v5:
-            ds_target['ptend_qn'] = (ds_target['state_q0002'] - ds_input['state_q0002'] + ds_target['state_q0003'] - ds_input['state_q0003'])/1200
+            ds_target['ptend_qn'] = (ds_target['state_q0002'] - ds_input['state_q0002'] + ds_target['state_q0003'] - ds_input['state_q0003'])/1200 # Qn=Q2+Q3 tendency [kg/kg/s]
             ds_target['ptend_u'] = (ds_target['state_u'] - ds_input['state_u'])/1200 # U tendency [m/s/s]
-            ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200
+            ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200 # V tendency [m/s/s]   
         ds_target = ds_target[self.target_vars]
         return ds_target
     
@@ -891,77 +934,36 @@ class data_utils:
         elif data_split == 'test':
             self.test_stride_sample = stride_sample
     
-    def set_filelist(self, data_split, start_idx = 0, end_idx = -1, num_resubmit = None, num_resubmit_abandon=None, period=None, samples_to_keep=None):
+    def set_filelist(self, data_split, start_idx = 0, end_idx = -1):
         '''
         This function sets the filelists corresponding to data splits for train, val, scoring, and test.
         '''
         filelist = []
         assert data_split in ['train', 'val', 'scoring', 'test'], 'Provided data_split is not valid. Available options are train, val, scoring, and test.'
-
-        # if num_resubmit is not None and num_resubmit_abandon is not None, then assert that stride_sample needs to be 1
-
         if data_split == 'train':
             assert self.train_regexps is not None, 'regexps for train is not set.'
             assert self.train_stride_sample is not None, 'stride_sample for train is not set.'
-            # if num_resubmit is not None and num_resubmit_abandon is not None:
-            #     assert self.train_stride_sample == 1, 'stride_sample for train needs to be 1.'
             for regexp in self.train_regexps:
                 filelist = filelist + glob.glob(self.data_path + "*/" + regexp)
-
-            sorted_list = sorted(filelist)
-            if num_resubmit is not None and num_resubmit_abandon is not None:
-                sorted_list = [file for i, file in enumerate(sorted_list) if i%num_resubmit >= num_resubmit_abandon]
-            self.train_filelist = sorted_list[start_idx:end_idx:self.train_stride_sample]
-            if (period is not None) and (samples_to_keep is not None):
-                self.train_filelist = [file for i, file in enumerate(self.train_filelist) if i%period < samples_to_keep]
-            # self.train_filelist = sorted(filelist)[start_idx:end_idx:self.train_stride_sample] # -1 to avoid the last file in mlis does not have corresponding mlos due to model crash
-            # # for every num_resubmit elements in filelist, abandon the first num_resubmit_abandon elements
-            # if num_resubmit is not None and num_resubmit_abandon is not None:
-            #     self.train_filelist = [file for i, file in enumerate(self.train_filelist) if i%num_resubmit >= num_resubmit_abandon]
-
+            self.train_filelist = sorted(filelist)[start_idx:end_idx:self.train_stride_sample]
         elif data_split == 'val':
             assert self.val_regexps is not None, 'regexps for val is not set.'
             assert self.val_stride_sample is not None, 'stride_sample for val is not set.'
             for regexp in self.val_regexps:
                 filelist = filelist + glob.glob(self.data_path + "*/" + regexp)
-            # self.val_filelist = sorted(filelist)[start_idx:end_idx:self.val_stride_sample]
-            # if num_resubmit is not None and num_resubmit_abandon is not None:
-            #     self.val_filelist = [file for i, file in enumerate(self.val_filelist) if i%num_resubmit >= num_resubmit_abandon]
-            sorted_list = sorted(filelist)
-            if num_resubmit is not None and num_resubmit_abandon is not None:
-                sorted_list = [file for i, file in enumerate(sorted_list) if i%num_resubmit >= num_resubmit_abandon]
-            self.val_filelist = sorted_list[start_idx:end_idx:self.val_stride_sample]
-            if (period is not None) and (samples_to_keep is not None):
-                self.val_filelist = [file for i, file in enumerate(self.val_filelist) if i%period < samples_to_keep]
-
+            self.val_filelist = sorted(filelist)[start_idx:end_idx:self.val_stride_sample]
         elif data_split == 'scoring':
             assert self.scoring_regexps is not None, 'regexps for scoring is not set.'
             assert self.scoring_stride_sample is not None, 'stride_sample for scoring is not set.'
             for regexp in self.scoring_regexps:
                 filelist = filelist + glob.glob(self.data_path + "*/" + regexp)
-            # self.scoring_filelist = sorted(filelist)[start_idx:end_idx:self.scoring_stride_sample]
-            # if num_resubmit is not None and num_resubmit_abandon is not None:
-            #     self.scoring_filelist = [file for i, file in enumerate(self.scoring_filelist) if i%num_resubmit >= num_resubmit_abandon]
-            sorted_list = sorted(filelist)
-            if num_resubmit is not None and num_resubmit_abandon is not None:
-                sorted_list = [file for i, file in enumerate(sorted_list) if i%num_resubmit >= num_resubmit_abandon]
-            self.scoring_filelist = sorted_list[start_idx:end_idx:self.scoring_stride_sample]
-            if (period is not None) and (samples_to_keep is not None):
-                self.scoring_filelist = [file for i, file in enumerate(self.scoring_filelist) if i%period < samples_to_keep]
+            self.scoring_filelist = sorted(filelist)[start_idx:end_idx:self.scoring_stride_sample]
         elif data_split == 'test':
             assert self.test_regexps is not None, 'regexps for test is not set.'
             assert self.test_stride_sample is not None, 'stride_sample for test is not set.'
             for regexp in self.test_regexps:
                 filelist = filelist + glob.glob(self.data_path + "*/" + regexp)
-            # self.test_filelist = sorted(filelist)[start_idx:end_idx:self.test_stride_sample]
-            # if num_resubmit is not None and num_resubmit_abandon is not None:
-            #     self.test_filelist = [file for i, file in enumerate(self.test_filelist) if i%num_resubmit >= num_resubmit_abandon]
-            sorted_list = sorted(filelist)
-            if num_resubmit is not None and num_resubmit_abandon is not None:
-                sorted_list = [file for i, file in enumerate(sorted_list) if i%num_resubmit >= num_resubmit_abandon]
-            self.test_filelist = sorted_list[start_idx:end_idx:self.test_stride_sample]
-            if (period is not None) and (samples_to_keep is not None):
-                self.test_filelist = [file for i, file in enumerate(self.test_filelist) if i%period < samples_to_keep]
+            self.test_filelist = sorted(filelist)[start_idx:end_idx:self.test_stride_sample]
 
     def get_filelist(self, data_split):
         '''
@@ -987,8 +989,6 @@ class data_utils:
         This can be used as a dataloader during training or it can be used to create entire datasets.
         When used as a dataloader for training, I/O can slow down training considerably.
         This function also normalizes the data.
-        mlis corresponds to input
-        mlos corresponds to target
         '''
         filelist = self.get_filelist(data_split)
         def gen():
@@ -997,12 +997,6 @@ class data_utils:
                 ds_input = self.get_input(file)
                 # read targets
                 ds_target = self.get_target(file)
-
-                if self.qinput_log:
-                    if 'state_q0002' in ds_input:
-                        ds_input['state_q0002'][:] = np.log10(1+ds_input['state_q0002']*1e6)
-                    if 'state_q0003' in ds_input:
-                        ds_input['state_q0003'][:] = np.log10(1+ds_input['state_q0003']*1e6)
                 
                 # normalization, scaling
                 if self.normalize:
@@ -1020,27 +1014,81 @@ class data_utils:
                 ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name=self.output_abbrev)
                 yield (ds_input.values, ds_target.values)
 
-        return tf.data.Dataset.from_generator(
-            gen,
-            output_types = (tf.float64, tf.float64),
-            output_shapes = ((None,self.input_feature_len),(None,self.target_feature_len))
-        )
+        if self.ml_backend == "tensorflow":
+
+            # Removed output_shapes and output_types, converting to output_signature as is
+            # recommended in the latest version of TensorFlow.
+            return self.tf.data.Dataset.from_generator(
+                gen, 
+                output_signature=(
+                    self.tf.TensorSpec(shape=(None, self.input_feature_len), dtype=self.tf.float64),
+                    self.tf.TensorSpec(shape=(None, self.target_feature_len), dtype=self.tf.float64)
+                )
+            )
+
+        elif self.ml_backend == "pytorch":
+            if self.successful_backend_import:
+
+                class IterableTorchDataset(self.torch.utils.data.IterableDataset):
+                    def __init__(this_self, data_generator, output_types, output_shapes):
+                        this_self.data_generator = data_generator
+                        this_self.output_types = output_types
+                        this_self.output_shapes = output_shapes
+
+                    def __iter__(this_self):
+                        for item in this_self.data_generator:
+
+                            input_array = self.torch.tensor(
+                                item[0], dtype=this_self.output_types[0]
+                            )
+                            target_array = self.torch.tensor(
+                                item[1], dtype=this_self.output_types[1]
+                            )
+
+                            # Assert final dimensions are correct.
+                            assert (
+                                input_array.shape[-1] == this_self.output_shapes[0][-1]
+                            )
+                            assert (
+                                target_array.shape[-1] == this_self.output_shapes[1][-1]
+                            )
+
+                            yield (input_array, target_array)
+
+                    def as_numpy_iterator(this_self):
+                        for item in this_self.data_generator:
+
+                            # Convert item to numpy array
+                            input_array = np.array(item[0])
+                            target_array = np.array(item[1])
+
+                            # Assert final dimensions are correct.
+                            assert input_array.shape[-1] == this_self.output_shapes[0][-1]
+                            assert target_array.shape[-1] == this_self.output_shapes[1][-1]
+
+                            yield (input_array, target_array)
+
+                dataset = IterableTorchDataset(
+                    gen(),
+                    (self.torch.float64, self.torch.float64),
+                    ((None, self.input_feature_len), (None, self.target_feature_len)),
+                )
+
+                return dataset
     
     def save_as_npy(self,
                  data_split, 
                  save_path = '',
                  save_latlontime_dict = False):
         '''
-        This function saves the training data as a .npy file.
+        This function saves the training data as a .npy file (also with option to save .h5).
         '''
         data_loader = self.load_ncdata_with_generator(data_split)
         npy_iterator = list(data_loader.as_numpy_iterator())
         npy_input = np.concatenate([npy_iterator[x][0] for x in range(len(npy_iterator))])
-        # npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
-
         if self.normalize:
-            npy_input[np.isinf(npy_input)] = 0 # replace inf with 0, some level have constant gas concentration.
-            #also replace nans with 0 (e.g., cld in stratosphere, std=0)
+            # replace inf and nan with 0
+            npy_input[np.isinf(npy_input)] = 0 
             npy_input[np.isnan(npy_input)] = 0
 
         # if save_path not exist, create it
@@ -1051,120 +1099,26 @@ class data_utils:
             save_path = save_path + '/'
 
         npy_input = np.float32(npy_input)
-        if self.save_h5:
-            h5_path = save_path + data_split + '_input.h5'
-            with h5py.File(h5_path, 'w') as hdf:
-                # Create a dataset within the HDF5 file
-                hdf.create_dataset('data', data=npy_input, dtype=npy_input.dtype)
-
         if self.save_npy:
             with open(save_path + data_split + '_input.npy', 'wb') as f:
                 np.save(f, npy_input)
-        
-        if self.save_zarr:
-            zarr_path = save_path + data_split + '_input.zarr'
-            z = zarr.open(zarr_path, mode='w', shape=npy_input.shape, dtype=npy_input.dtype, chunks=(100, npy_input.shape[1]))
-            z[:] = npy_input
-
-        
+        if self.save_h5:
+            h5_path = save_path + data_split + '_input.h5'
+            with h5py.File(h5_path, 'w') as hdf:
+                hdf.create_dataset('data', data=npy_input, dtype=npy_input.dtype)
         del npy_input
         
         npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
         npy_target = np.float32(npy_target)
 
-        if self.save_h5:
-            h5_path = save_path + data_split + '_target.h5'
-            with h5py.File(h5_path, 'w') as hdf:
-                # Create a dataset within the HDF5 file
-                hdf.create_dataset('data', data=npy_target, dtype=npy_target.dtype)
-
         if self.save_npy:
             with open(save_path + data_split + '_target.npy', 'wb') as f:
                 np.save(f, npy_target)
+        if self.save_h5:
+            h5_path = save_path + data_split + '_target.h5'
+            with h5py.File(h5_path, 'w') as hdf:
+                hdf.create_dataset('data', data=npy_target, dtype=npy_target.dtype)
 
-        if self.save_zarr:
-            zarr_path = save_path + data_split + '_target.zarr'
-            z = zarr.open(zarr_path, mode='w', shape=npy_target.shape, dtype=npy_target.dtype, chunks=(100, npy_target.shape[1]))
-            z[:] = npy_target
-
-
-        if data_split == 'train':
-            data_files = self.train_filelist
-        elif data_split == 'val':
-            data_files = self.val_filelist
-        elif data_split == 'scoring':
-            data_files = self.scoring_filelist
-        elif data_split == 'test':
-            data_files = self.test_filelist
-        if save_latlontime_dict:
-            dates = [re.sub(f'^.*{self.input_abbrev}\.', '', x) for x in data_files]
-            dates = [re.sub('\.nc$', '', x) for x in dates]
-            repeat_dates = []
-            for date in dates:
-                for i in range(self.num_latlon):
-                    repeat_dates.append(date)
-            latlontime = {i: [(self.grid_info['lat'].values[i%self.num_latlon], self.grid_info['lon'].values[i%self.num_latlon]), repeat_dates[i]] for i in range(npy_input.shape[0])}
-            with open(save_path + data_split + '_indextolatlontime.pkl', 'wb') as f:
-                pickle.dump(latlontime, f)
-
-    def load_ncdata_with_generator_inputonly(self, data_split):
-        '''
-        This function works as a dataloader when training the emulator with raw netCDF files.
-        mlis corresponds to input
-        '''
-        filelist = self.get_filelist(data_split)
-        def gen():
-            for file in filelist:
-                # read inputs
-                ds_input = self.get_input(file)
-                # read targets
-                #ds_target = self.get_target(file)
-                
-                # normalization, scaling
-                if self.normalize:
-                    ds_input = (ds_input - self.input_mean)/(self.input_max - self.input_min)
-                    #ds_target = ds_target*self.output_scale
-                else:
-                    ds_input = ds_input.drop(['lat','lon'])
-
-                # stack
-                # ds = ds.stack({'batch':{'sample','ncol'}})
-                ds_input = ds_input.stack({'batch':{'ncol'}})
-                ds_input = ds_input.to_stacked_array('mlvar', sample_dims=['batch'], name=self.input_abbrev)
-                # dso = dso.stack({'batch':{'sample','ncol'}})
-                #ds_target = ds_target.stack({'batch':{'ncol'}})
-                #ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name='mlos')
-                yield ds_input.values #ds_target.values)
-
-        return tf.data.Dataset.from_generator(
-            gen,
-            output_types = tf.float64, #tf.float64),
-            output_shapes = (None,self.input_feature_len),   #(None,self.target_feature_len))
-        )
-
-    def save_as_npy_inputonly(self,
-                 data_split, 
-                 save_path = '',
-                 save_latlontime_dict = False):
-        '''
-        This function saves the training data as a .npy file.
-        '''
-        data_loader = self.load_ncdata_with_generator_inputonly(data_split)
-        npy_iterator = list(data_loader.as_numpy_iterator())
-        npy_input = np.concatenate([npy_iterator[x] for x in range(len(npy_iterator))])
-        
-        # if save_path not exist, create it
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        # add "/" to the end of save_path if it does not exist
-        if save_path[-1] != '/':
-            save_path = save_path + '/'
-
-        #npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
-        with open(save_path + data_split + '_input.npy', 'wb') as f:
-            np.save(f, np.float32(npy_input))
-        # with open(save_path + data_split + '_target.npy', 'wb') as f:
-        #     np.save(f, np.float32(npy_target))
         if data_split == 'train':
             data_files = self.train_filelist
         elif data_split == 'val':
@@ -1193,6 +1147,9 @@ class data_utils:
         return var_arr
     
     def save_norm(self, save_path = '', write=False):
+        '''
+        This function calculates and saves the norms for input and target variables. i.e., for input, x = (x - inp_sub)/inpdiv, for target, y = y*out_scale.
+        '''
         # calculate norms for input first
         input_sub  = []
         input_div  = []
@@ -1345,6 +1302,8 @@ class data_utils:
         pressure_grid_plotting = np.concatenate(pg_lats, axis = 1)
         return pressure_grid_plotting
 
+
+
     def output_weighting(self, output, data_split, just_weights = False):
         '''
         This function does four transformations, and assumes we are using V1 variables:
@@ -1358,7 +1317,7 @@ class data_utils:
         if just_weights:
             weightings = np.ones(output.shape)
 
-        if not self.full_vars and not self.full_vars_v5:
+        if not self.full_vars:
             ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             netsw = output[:,120].reshape((int(num_samples/self.num_latlon), self.num_latlon))
@@ -1372,44 +1331,14 @@ class data_utils:
             if just_weights:
                 ptend_t_weight = weightings[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
                 ptend_q0001_weight = weightings[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-                netsw_weight = weightings[:,360].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                flwds_weight = weightings[:,361].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                precsc_weight = weightings[:,362].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                precc_weight = weightings[:,363].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                sols_weight = weightings[:,364].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                soll_weight = weightings[:,365].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                solsd_weight = weightings[:,366].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                solld_weight = weightings[:,367].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-        elif self.full_vars_v5:
-            ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-            ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-            ptend_qn = output[:,120:180].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-            ptend_u = output[:,180:240].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-            ptend_v = output[:,240:300].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-            netsw = output[:,300].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            flwds = output[:,301].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            precsc = output[:,302].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            precc = output[:,303].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            sols = output[:,304].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            soll = output[:,305].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            solsd = output[:,306].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            solld = output[:,307].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-            state_wind = ((ptend_u**2) + (ptend_v**2))**.5
-            self.target_energy_conv['ptend_wind'] = state_wind
-            if just_weights:
-                ptend_t_weight = weightings[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-                ptend_q0001_weight = weightings[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-                ptend_qn_weight = weightings[:,120:180].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-                ptend_u_weight = weightings[:,180:240].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-                ptend_v_weight = weightings[:,240:300].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-                netsw_weight = weightings[:,300].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                flwds_weight = weightings[:,301].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                precsc_weight = weightings[:,302].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                precc_weight = weightings[:,303].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                sols_weight = weightings[:,304].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                soll_weight = weightings[:,305].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                solsd_weight = weightings[:,306].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-                solld_weight = weightings[:,307].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                netsw_weight = weightings[:,120].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                flwds_weight = weightings[:,121].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                precsc_weight = weightings[:,122].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                precc_weight = weightings[:,123].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                sols_weight = weightings[:,124].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                soll_weight = weightings[:,125].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                solsd_weight = weightings[:,126].reshape((int(num_samples/self.num_latlon), self.num_latlon))
+                solld_weight = weightings[:,127].reshape((int(num_samples/self.num_latlon), self.num_latlon))
         else:
             ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
@@ -1480,14 +1409,7 @@ class data_utils:
                     ptend_q0003_weight = ptend_q0003_weight/self.output_scale['ptend_q0003'].values[np.newaxis, np.newaxis, :]
                     ptend_u_weight = ptend_u_weight/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
                     ptend_v_weight = ptend_v_weight/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
-            if self.full_vars_v5:
-                ptend_qn = ptend_qn/self.output_scale['ptend_qn'].values[np.newaxis, np.newaxis, :]
-                ptend_u = ptend_u/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
-                ptend_v = ptend_v/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
-                if just_weights:
-                    ptend_qn_weight = ptend_qn_weight/self.output_scale['ptend_qn'].values[np.newaxis, np.newaxis, :]
-                    ptend_u_weight = ptend_u_weight/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
-                    ptend_v_weight = ptend_v_weight/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
+
         # [1] Weight vertical levels by dp/g
         # only for vertically-resolved variables, e.g. ptend_{t,q0001}
         # dp/g = -\rho * dz
@@ -1516,14 +1438,6 @@ class data_utils:
                 ptend_q0002_weight = ptend_q0002_weight * dp/self.grav
                 ptend_q0003_weight = ptend_q0003_weight * dp/self.grav
                 ptend_u_weight = ptend_u_weight * dp/self.grav  
-                ptend_v_weight = ptend_v_weight * dp/self.grav
-        if self.full_vars_v5:
-            ptend_qn = ptend_qn * dp/self.grav
-            ptend_u = ptend_u * dp/self.grav
-            ptend_v = ptend_v * dp/self.grav
-            if just_weights:
-                ptend_qn_weight = ptend_qn_weight * dp/self.grav
-                ptend_u_weight = ptend_u_weight * dp/self.grav
                 ptend_v_weight = ptend_v_weight * dp/self.grav
 
         # [2] weight by area
@@ -1557,14 +1471,6 @@ class data_utils:
             if just_weights:
                 ptend_q0002_weight = ptend_q0002_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_q0003_weight = ptend_q0003_weight * self.area_wgt[np.newaxis, :, np.newaxis]
-                ptend_u_weight = ptend_u_weight * self.area_wgt[np.newaxis, :, np.newaxis]
-                ptend_v_weight = ptend_v_weight * self.area_wgt[np.newaxis, :, np.newaxis]
-        if self.full_vars_v5:
-            ptend_qn = ptend_qn * self.area_wgt[np.newaxis, :, np.newaxis]
-            ptend_u = ptend_u * self.area_wgt[np.newaxis, :, np.newaxis]
-            ptend_v = ptend_v * self.area_wgt[np.newaxis, :, np.newaxis]
-            if just_weights:
-                ptend_qn_weight = ptend_qn_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_u_weight = ptend_u_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_v_weight = ptend_v_weight * self.area_wgt[np.newaxis, :, np.newaxis]
 
@@ -1601,14 +1507,6 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * self.target_energy_conv['ptend_q0003']
                 ptend_u_weight = ptend_u_weight * self.target_energy_conv['ptend_wind']
                 ptend_v_weight = ptend_v_weight * self.target_energy_conv['ptend_wind']
-        if self.full_vars_v5:
-            ptend_qn = ptend_qn * self.target_energy_conv['ptend_qn']
-            ptend_u = ptend_u * self.target_energy_conv['ptend_wind']
-            ptend_v = ptend_v * self.target_energy_conv['ptend_wind']
-            if just_weights:
-                ptend_qn_weight = ptend_qn_weight * self.target_energy_conv['ptend_qn']
-                ptend_u_weight = ptend_u_weight * self.target_energy_conv['ptend_wind']
-                ptend_v_weight = ptend_v_weight * self.target_energy_conv['ptend_wind']
 
 
         if just_weights:
@@ -1617,20 +1515,6 @@ class data_utils:
                                              ptend_q0001_weight.reshape((num_samples, 60)), \
                                              ptend_q0002_weight.reshape((num_samples, 60)), \
                                              ptend_q0003_weight.reshape((num_samples, 60)), \
-                                             ptend_u_weight.reshape((num_samples, 60)), \
-                                             ptend_v_weight.reshape((num_samples, 60)), \
-                                             netsw_weight.reshape((num_samples))[:, np.newaxis], \
-                                             flwds_weight.reshape((num_samples))[:, np.newaxis], \
-                                             precsc_weight.reshape((num_samples))[:, np.newaxis], \
-                                             precc_weight.reshape((num_samples))[:, np.newaxis], \
-                                             sols_weight.reshape((num_samples))[:, np.newaxis], \
-                                             soll_weight.reshape((num_samples))[:, np.newaxis], \
-                                             solsd_weight.reshape((num_samples))[:, np.newaxis], \
-                                             solld_weight.reshape((num_samples))[:, np.newaxis]], axis = 1)
-            elif self.full_vars_v5:
-                weightings = np.concatenate([ptend_t_weight.reshape((num_samples, 60)), \
-                                             ptend_q0001_weight.reshape((num_samples, 60)), \
-                                             ptend_qn_weight.reshape((num_samples, 60)), \
                                              ptend_u_weight.reshape((num_samples, 60)), \
                                              ptend_v_weight.reshape((num_samples, 60)), \
                                              netsw_weight.reshape((num_samples))[:, np.newaxis], \
@@ -1667,10 +1551,6 @@ class data_utils:
             if self.full_vars:
                 var_dict['ptend_q0002'] = ptend_q0002
                 var_dict['ptend_q0003'] = ptend_q0003
-                var_dict['ptend_u'] = ptend_u
-                var_dict['ptend_v'] = ptend_v
-            if self.full_vars_v5:
-                var_dict['ptend_qn'] = ptend_qn
                 var_dict['ptend_u'] = ptend_u
                 var_dict['ptend_v'] = ptend_v
 
@@ -1820,13 +1700,19 @@ class data_utils:
         returns vector of length level or 1
         '''
         assert samplepreds.shape[1] == self.num_latlon
+        assert len(samplepreds.shape) == len(target.shape) + 1
+        assert len(samplepreds.shape) == 3 or len(samplepreds.shape) == 4
         num_crps = samplepreds.shape[-1]
         mae = np.mean(np.abs(samplepreds - target[..., np.newaxis]), axis = (0, -1)) # mean over time and crps samples
+        samplepreds = np.sort(samplepreds, axis = -1)
         diff = samplepreds[..., 1:] - samplepreds[..., :-1]
         count = np.arange(1, num_crps) * np.arange(num_crps - 1, 0, -1)
-        spread = (diff * count[np.newaxis, np.newaxis, np.newaxis, :]).mean(axis = (0, -1)) # mean over time and crps samples
+        if len(samplepreds.shape) == 4:
+            spread = (diff * count[np.newaxis, np.newaxis, np.newaxis, :]).sum(axis = -1).mean(axis = 0) # sum over crps samples and mean over time
+        elif len(samplepreds.shape) == 3:
+            spread = (diff * count[np.newaxis, np.newaxis, :]).sum(axis = -1).mean(axis = 0) # sum over crps samples and mean over time
         crps = mae - spread/(num_crps*(num_crps-1))
-        # already divided by two in spread by exploiting symmetry
+        # count was not multiplied by two so no need to divide by two
         if avg_grid:
             return crps.mean(axis = 0) # we decided to separately average globally at end
         else:
@@ -2068,12 +1954,3 @@ class data_utils:
             with open(save_path + 'cnn_predict_reshaped.npy', 'wb') as f:
                 np.save(f, np.float32(npy_predict_cnn_reshaped))
         return npy_predict_cnn_reshaped
-
-
-
-
-  
-
-
-
-
