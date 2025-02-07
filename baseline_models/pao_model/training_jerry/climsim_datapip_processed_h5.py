@@ -10,7 +10,7 @@ import torch
 import glob
 import h5py
 
-class dataset_train(Dataset):
+class climsim_dataset_processed_h5(Dataset):
     def __init__(self, 
                  parent_path,
                  output_prune,
