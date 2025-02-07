@@ -417,7 +417,50 @@ class data_utils:
                             'tm_pbuf_COSZRS',
                             'clat',
                             'slat',
-                            'icol',] 
+                            'icol',]
+
+        self.v6_inputs = ['state_t',
+                            'state_rh',
+                            'state_qn',
+                            'liq_partition',
+                            'state_u',
+                            'state_v',
+                            'state_t_dyn',
+                            'state_q0_dyn',
+                            'state_u_dyn',
+                            'tm_state_t_dyn',
+                            'tm_state_q0_dyn',
+                            'tm_state_u_dyn',
+                            'state_t_prvphy',
+                            'state_q0001_prvphy',
+                            'state_qn_prvphy',
+                            'state_u_prvphy',
+                            'tm_state_t_prvphy',
+                            'tm_state_q0001_prvphy',
+                            'tm_state_qn_prvphy',
+                            'tm_state_u_prvphy',
+                            'pbuf_ozone',
+                            'pbuf_CH4',
+                            'pbuf_N2O',
+                            'state_ps',
+                            'pbuf_SOLIN',
+                            'pbuf_LHFLX',
+                            'pbuf_SHFLX',
+                            'pbuf_TAUX',
+                            'pbuf_TAUY',
+                            'pbuf_COSZRS',
+                            'cam_in_ALDIF',
+                            'cam_in_ALDIR',
+                            'cam_in_ASDIF',
+                            'cam_in_ASDIR',
+                            'cam_in_LWUP',
+                            'cam_in_ICEFRAC',
+                            'cam_in_LANDFRAC',
+                            'cam_in_OCNFRAC',
+                            'cam_in_SNOWHICE',
+                            'cam_in_SNOWHLAND',
+                            'clat',
+                            'slat',] 
                 
         self.v2_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -491,6 +534,20 @@ class data_utils:
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
                            'cam_out_SOLLD']
+
+        self.v6_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
 
         self.var_lens = {#inputs
                         'state_t':self.num_levels,
@@ -666,9 +723,13 @@ class data_utils:
         self.input_vars = self.v1_inputs
         self.target_vars = self.v1_outputs
         self.ps_index = 120
-        self.input_feature_len = 124
-        self.target_feature_len = 128
         self.full_vars = False
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 124
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
 
     def set_to_v1_dyn_vars(self):
         '''
@@ -678,9 +739,13 @@ class data_utils:
         self.input_vars = self.v1_dyn_inputs
         self.target_vars = self.v1_outputs
         self.ps_index = 240
-        self.input_feature_len = 244
-        self.target_feature_len = 128
         self.full_vars = False
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 224
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
 
     def set_to_v2_vars(self):
         '''
@@ -690,9 +755,13 @@ class data_utils:
         self.input_vars = self.v2_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_vars(self):
         '''
@@ -702,9 +771,13 @@ class data_utils:
         self.input_vars = self.v2_rh_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_mc_vars(self):
         '''
@@ -714,9 +787,13 @@ class data_utils:
         self.input_vars = self.v2_rh_mc_inputs
         self.target_vars = self.v2_rh_mc_outputs
         self.ps_index = 360
-        self.input_feature_len = 557
-        self.target_feature_len = 308
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def set_to_v2_dyn_vars(self):
         '''
@@ -726,9 +803,13 @@ class data_utils:
         self.input_vars = self.v2_dyn_inputs
         self.target_vars = self.v2_outputs
         self.ps_index = 600
-        self.input_feature_len = 797
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 797
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v3_vars(self):
         '''
@@ -738,9 +819,13 @@ class data_utils:
         self.input_vars = self.v3_inputs
         self.target_vars = self.v3_outputs
         self.ps_index = 720
-        self.input_feature_len = 737
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 737
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
 
     def set_to_v4_vars(self):
         '''
@@ -750,9 +835,13 @@ class data_utils:
         self.input_vars = self.v4_inputs
         self.target_vars = self.v4_outputs
         self.ps_index = 1500
-        self.input_feature_len = 1525 #737+788
-        self.target_feature_len = 368
         self.full_vars = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1525
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
     
     def set_to_v5_vars(self):
         '''
@@ -762,10 +851,32 @@ class data_utils:
         self.input_vars = self.v5_inputs
         self.target_vars = self.v5_outputs
         self.ps_index = 1380
-        self.input_feature_len = 1405 #737+788 - 120
-        self.target_feature_len = 308
         self.full_vars = False
         self.full_vars_v5 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1405 = 737 + 788 - 120
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+
+    def set_to_v6_vars(self):
+        '''
+        This function sets the inputs and outputs to the V6 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v6_inputs
+        self.target_vars = self.v6_outputs
+        self.ps_index = 1380
+        self.full_vars = False
+        self.full_vars_v5 = True
+        self.full_vars_v6 = True
+        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
+        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
     def get_xrdata(self, file, file_vars = None):
         '''
