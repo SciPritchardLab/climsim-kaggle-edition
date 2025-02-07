@@ -29,11 +29,11 @@ class pao_model_metadata(modulus.ModelMetaData):
 
 class pao_model(modulus.Module):
     def __init__(self,
-                 input_series_num: int = 23, # number of input seriesuences
+                 input_series_num: int = 23, # number of input series
                  input_scalar_num: int = 19, # number of input scalar
-                 target_series_num: int = 5, # number of target seriesuences
+                 target_series_num: int = 5, # number of target series
                  target_scalar_num: int = 8, # number of target scalar
-                 hidden_series_num: int = 128, # number of hidden units in MLP for seriesuences
+                 hidden_series_num: int = 128, # number of hidden units in MLP for series
                  hidden_scalar_num: int = 128, # number of hidden units in MLP for scalar
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
@@ -46,7 +46,7 @@ class pao_model(modulus.Module):
         self.hidden_series_num = hidden_series_num
         self.hidden_scalar_num = hidden_scalar_num
         self.num_hidden_total = self.hidden_series_num + self.hidden_scalar_num
-        # 60 seriesuences 1d cnn
+        # 60 series 1d cnn
         self.feature_scale = nn.ModuleList([
             FeatureScale(60) for _ in range(self.input_series_num)
         ])
@@ -101,12 +101,16 @@ class pao_model(modulus.Module):
         )
 
     def reshape_input(self, x):
-        series_inputs = x[:,:self.input_series_num*60].reshape(self.input_series_num, 60)
-        scalar_inputs = x[self.input_series_num*60:]
+        batch_size = x.size(0)
+        series_part = x[:, :self.input_series_num*60]
+        series_inputs = series_part.reshape(batch_size, self.input_series_num, 60)
+        scalar_inputs = x[:, self.input_series_num*60:]
         return series_inputs, scalar_inputs
 
     def reshape_output(self, series_output, scalar_output):
-        return torch.concat([series_output, scalar_output], dim = 1)
+        batch_size = series_output.size(0)
+        series_part = series_output.reshape(batch_size, self.target_series_num * 60)
+        return torch.cat([series_part, scalar_output], dim = 1)
     
     def count_trainable_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
