@@ -27,7 +27,7 @@ class pao_model_metadata(modulus.ModelMetaData):
     amp_cpu: bool = True
     amp_gpu: bool = True
 
-class pao_model(modulus.Module):
+class pao_model_nn(modulus.Module):
     def __init__(self,
                  input_series_num: int = 23, # number of input series
                  input_scalar_num: int = 19, # number of input scalar

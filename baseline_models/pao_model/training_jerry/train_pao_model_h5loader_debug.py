@@ -7,7 +7,7 @@ from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
 from modulus.metrics.general.mse import mse
-from loss_energy import loss_energy
+
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
@@ -21,8 +21,9 @@ from climsim_utils.data_utils import *
 
 from climsim_datapip_processed import climsim_dataset_processed
 from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
-from climsim_unet import ClimsimUnet
-import climsim_unet as climsim_unet
+
+from pao_model import pao_model_nn
+import pao_model as pao_model
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
@@ -159,7 +160,7 @@ def main(cfg: DictConfig) -> float:
     tmp_output_prune = cfg.output_prune
     tmp_strato_lev = cfg.strato_lev_out
 
-    model = pao_model(
+    model = pao_model_nn(
             num_seq_inputs = data.input_series_num,
             num_scalar_inputs = data.input_scalar_num,
             num_seq_targets = data.target_series_num,
@@ -473,7 +474,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        climsim_unet.device = "cpu"
+        pao_model.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)
