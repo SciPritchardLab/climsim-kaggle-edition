@@ -96,6 +96,7 @@ logger: 'wandb'
 wandb:
    project: "climsim3_allhands"
    entity: "cbrain"
+
 num_workers: 32
 
 # model hyperparameters

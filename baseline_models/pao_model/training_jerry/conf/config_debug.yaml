@@ -41,48 +41,38 @@
 
 climsim_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/'
 data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_intercomparison_debug/'
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
-input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v6_pervar.nc'
-input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v6_pervar.nc'
-input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v6_pervar.nc'
-output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v6.nc'
-qn_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qn_exp_lambda_large.txt'
+input_mean: 'inputs/input_mean_v6_pervar.nc'
+input_max: 'inputs/input_max_v6_pervar.nc'
+input_min: 'inputs/input_min_v6_pervar.nc'
+output_scale: 'outputs/output_scale_std_lowerthred_v6.nc'
 
 val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_input.npy'
 val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_target.npy'
-variable_subsets: 'v6'
-expname: 'resLSTM_512_v6'
+variable_subsets: 'v2_rh_mc'
+qinput_log: False
 restart_path: ''
+classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
+expname: 'pao_model_debug'
 
-qinput_prune: True
 output_prune: True
-strato_lev: 15
 strato_lev_out: 12
-decouple_cloud: False
-aggressive_pruning: False
-strato_lev_qinput: -1
-strato_lev_tinput: -1
-input_clip: False
-input_clip_rhonly: False
-
 batch_size: 1024
-epochs: 48
+epochs: 16
 learning_rate: 0.0001
-optimizer: 'AdamW'
-loss: 'smoothL1'
+optimizer: 'adam'
+loss: 'huber'
 
-save_top_ckpts: 5
+save_top_ckpts: 15 
 top_ckpt_mode: 'min'
-clip_grad: True
-clip_grad_norm: 100000
 
 # setup the scheduler with 1. step 2. cosine 3. reducedonplateau
-scheduler_name: 'cosine_warmup'
+scheduler_name: 'step'
 scheduler:
    step:
-      step_size: 2
-      gamma: 0.3162278
+      step_size: 3
+      gamma: 0.5
    plateau:
       patience: 2
       factor: 0.1
@@ -90,14 +80,25 @@ scheduler:
       T_max: 2
       eta_min: 0.00001
    cosine_warmup:
-      T_0: 1
+      T_0: 5
       T_mult: 1
-      eta_min: 1e-7
+      eta_min: 1.5e-6
 
-early_stop_step: 1000
-mini_batch_log_freq: 100
+scheduler_warmup: 
+   enable: False
+   warmup_steps: 20
+   warmup_strategy: 'cos'
+   init_lr: 1e-7
+
+early_stop_step: -1
+
 logger: 'wandb'
 wandb:
-   project: "climsim3_intercomparison_debug"
+   project: "climsim3_allhands"
+   entity: "cbrain"
 
-num_workers: 8
+num_workers: 32
+
+# model hyperparameters
+num_hidden_seq: 128
+num_hidden_scalar: 128
