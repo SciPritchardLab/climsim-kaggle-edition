@@ -44,7 +44,7 @@ torch.cuda.manual_seed_all(seed)  # if using multi-GPU
 np.random.seed(seed)
 random.seed(seed)
 
-@hydra.main(version_base="1.2", config_path="conf", config_name="config")
+@hydra.main(version_base="1.2", config_path="conf", config_name="config_debug")
 def main(cfg: DictConfig) -> float:
 
     DistributedManager.initialize()

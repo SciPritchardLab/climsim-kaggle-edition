@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import torch
 
-class dataset_val(Dataset):
+class climsim_dataset_processed(Dataset):
     def __init__(self, 
                  input_paths, 
                  target_paths, 
