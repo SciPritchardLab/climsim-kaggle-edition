@@ -243,7 +243,7 @@ class ClimsimUnet(modulus.Module):
             #decreases the resolution for each level (starts high since order of layers is inverted, we start w outer layer)
             res = seq_resolution >> level
 
-            #if this is the last channel (middle of the architecture)
+            #if this is the middle of the architecture, first part of decoder
             if level == len(channel_mult) - 1:
                 self.dec[f"{res}_in0"] = UNetBlock_atten(
                     in_channels=cout, out_channels=cout, attention=True, **block_kwargs
@@ -421,6 +421,7 @@ class ClimsimUnet(modulus.Module):
         #concatenate y_profile and y_scalar to (batch, num_vars_profile_out*levels+num_vars_scalar_out)
         y = torch.cat((y_profile, y_scalar), dim=1)
 
+        #prunes the stratosphere values
         if self.output_prune:
             y = y.clone()
             y[:, 60:60+self.strato_lev] = y[:, 60:60+self.strato_lev].clone().zero_()
@@ -431,3 +432,9 @@ class ClimsimUnet(modulus.Module):
 
         return y
     
+    def count_trainable_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+    if __name__ == '__main__':
+        model = ClimsimUnet()
+        print(model.count_trainable_parameters())

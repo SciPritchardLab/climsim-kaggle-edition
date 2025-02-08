@@ -201,6 +201,8 @@ class Conv1d(torch.nn.Module):
                     padding=max(f_pad - w_pad, 0),
                 )
                 x = torch.nn.functional.conv1d(x, w, padding=max(w_pad - f_pad, 0))
+            
+            #when we down sample we use a stride of 2 and our tensor length is halved
             elif self.fused_resample and self.down and w is not None:
                 x = torch.nn.functional.conv1d(x, w, padding=w_pad + f_pad)
                 x = torch.nn.functional.conv1d(

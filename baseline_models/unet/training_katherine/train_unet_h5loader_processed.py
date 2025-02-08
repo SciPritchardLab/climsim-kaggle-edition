@@ -290,7 +290,7 @@ def main(cfg: DictConfig) -> float:
         initialize_wandb(
             project=cfg.wandb.project,
             name=cfg.expname,
-            entity="zeyuan_hu",
+            entity=cfg.wandb.entity,
             mode="online",
         )
         LaunchLogger.initialize(use_wandb=True)
