@@ -165,7 +165,7 @@ def main(cfg: DictConfig) -> float:
             hidden_series_num = cfg.hidden_series_num,
             hidden_scalar_num = cfg.hidden_scalar_num,
             output_prune = cfg.output_prune,
-            strato_lev = cfg.strato_lev_out,
+            strato_lev_out = cfg.strato_lev_out,
             ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -202,11 +202,11 @@ def main(cfg: DictConfig) -> float:
     # create optimizer
     if cfg.optimizer == 'adam':
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    if cfg.optimizer == 'AdamW':
+    elif cfg.optimizer == 'AdamW':
         optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    if cfg.optimizer == 'RAdam':
+    elif cfg.optimizer == 'RAdam':
         optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
-    if cfg.optimizer == 'SOAP':
+    elif cfg.optimizer == 'SOAP':
         optimizer = SOAP(model.parameters(), lr = cfg.learning_rate, betas=(.95, .95), weight_decay=.01, precondition_frequency=10)
     else:
         raise ValueError('Optimizer not implemented')
