@@ -29,12 +29,12 @@ class pao_model_metadata(modulus.ModelMetaData):
 
 class pao_model_nn(modulus.Module):
     def __init__(self,
-                 input_series_num: int = 23, # number of input series
-                 input_scalar_num: int = 19, # number of input scalar
+                 input_series_num: int = 9, # number of input series
+                 input_scalar_num: int = 17, # number of input scalar
                  target_series_num: int = 5, # number of target series
                  target_scalar_num: int = 8, # number of target scalar
-                 hidden_series_num: int = 128, # number of hidden units in MLP for series
-                 hidden_scalar_num: int = 128, # number of hidden units in MLP for scalar
+                 hidden_series_num: int = 160, # number of hidden units in MLP for series
+                 hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
                 ):
@@ -46,6 +46,8 @@ class pao_model_nn(modulus.Module):
         self.hidden_series_num = hidden_series_num
         self.hidden_scalar_num = hidden_scalar_num
         self.num_hidden_total = self.hidden_series_num + self.hidden_scalar_num
+        self.output_prune = output_prune
+        self.strato_lev_out = strato_lev_out
         # 60 series 1d cnn
         self.feature_scale = nn.ModuleList([
             FeatureScale(60) for _ in range(self.input_series_num)
@@ -78,7 +80,7 @@ class pao_model_nn(modulus.Module):
             nn.LSTM(self.num_hidden_total, self.num_hidden_total, 2, batch_first=True, bidirectional=True, dropout=0.0),
         )
         # output layer
-        self.output_series_mlp_input_dim = self.num_hidden_total
+        self.output_series_mlp_input_dim = self.num_hidden_total * 2
         self.series_output_mlp = nn.Sequential(
             nn.Linear(self.output_series_mlp_input_dim, self.num_hidden_total),
             nn.GELU(),
@@ -88,7 +90,7 @@ class pao_model_nn(modulus.Module):
             nn.GELU(),
             nn.Linear(self.hidden_series_num, self.target_series_num)
         )
-        self.output_scalar_mlp_input_dim = self.num_hidden_total * 60
+        self.output_scalar_mlp_input_dim = self.num_hidden_total * 60 * 2
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
         self.scalar_output_mlp = nn.Sequential(
             nn.Linear(self.output_scalar_mlp_input_dim, self.hidden_scalar_num),
@@ -118,7 +120,7 @@ class pao_model_nn(modulus.Module):
     def forward(self, x):
         series_inputs, scalar_inputs = self.reshape_input(x)
         # create series_features
-        # create scalar_features
+        # create scalar_inputs
         # concat dim60 cols
         dim60_x = []
         scale_ix = 0
@@ -150,7 +152,7 @@ class pao_model_nn(modulus.Module):
         x = self.input_linear(x)  # (batch, series_len, 128)
         x = x + position
         # other cols
-        scalar_x = scalar_features  # (batch, 19)
+        scalar_x = scalar_inputs  # (batch, 19)
         scalar_x = self.other_feats_mlp(scalar_x)  # (batch, hidden)
         scalar_x_list = []
         for i in range(60):

@@ -50,13 +50,11 @@ def main(cfg: DictConfig) -> float:
     DistributedManager.initialize()
     dist = DistributedManager()
 
-    grid_path = os.path.join(cfg.climsim_path, '/grid_info/ClimSim_low-res_grid-info.nc')
-    norm_path = os.path.join(cfg.climsim_path, '/preprocessing/normalizations/')
-    grid_info = xr.open_dataset(grid_path)
-    input_mean = xr.open_dataset(os.path.join(norm_path, cfg.input_mean))
-    input_max = xr.open_dataset(os.path.join(norm_path, cfg.input_max))
-    input_min = xr.open_dataset(os.path.join(norm_path, cfg.input_min))
-    output_scale = xr.open_dataset(os.path.join(norm_path, cfg.output_scale))
+    grid_info = xr.open_dataset(cfg.grid_info)
+    input_mean = xr.open_dataset(cfg.input_mean)
+    input_max = xr.open_dataset(cfg.input_max)
+    input_min = xr.open_dataset(cfg.input_min)
+    output_scale = xr.open_dataset(cfg.output_scale)
 
     data = data_utils(grid_info = grid_info, 
                   input_mean = input_mean, 
@@ -157,18 +155,15 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    tmp_output_prune = cfg.output_prune
-    tmp_strato_lev = cfg.strato_lev_out
-
     model = pao_model_nn(
-            num_seq_inputs = data.input_series_num,
-            num_scalar_inputs = data.input_scalar_num,
-            num_seq_targets = data.target_series_num,
-            num_scalar_targets = data.target_scalar_num,
-            num_hidden_seq = cfg.num_hidden_seq,
-            num_hidden_scalar = cfg.num_hidden_scalar,
-            output_prune = tmp_output_prune,
-            strato_lev = tmp_strato_lev,
+            input_series_num = data.input_series_num,
+            input_scalar_num = data.input_scalar_num,
+            target_series_num = data.target_series_num,
+            target_scalar_num = data.target_scalar_num,
+            hidden_series_num = cfg.hidden_series_num,
+            hidden_scalar_num = cfg.hidden_scalar_num,
+            output_prune = cfg.output_prune,
+            strato_lev = cfg.strato_lev_out,
             ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -340,7 +335,7 @@ def main(cfg: DictConfig) -> float:
         #                           num_workers=cfg.num_workers)
         # wrap the epoch in launch logger to control frequency of output for console logs
         with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=10) as launchlog:
-            # model.train()
+            model.train()
             # Wrap train_loader with tqdm for a progress bar
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
@@ -354,7 +349,7 @@ def main(cfg: DictConfig) -> float:
                 #     target[:,180:180+cfg.strato_lev] = 0
                 data_input, target = data_input.to(device), target.to(device)
                 optimizer.zero_grad()
-                output = eval_step_forward(model, data_input)
+                output = model(data_input)
                 loss = criterion(output, target)
                 loss.backward()
                 # optimizer.zero_grad()
@@ -392,7 +387,7 @@ def main(cfg: DictConfig) -> float:
                 current_step += 1
             #launchlog.log_epoch({"Learning Rate": optimizer.param_groups[0]["lr"]})
             
-            # model.eval()
+            model.eval()
             val_loss = 0.0
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')
