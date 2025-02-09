@@ -101,10 +101,12 @@ def main(cfg: DictConfig) -> float:
 
     # print(train_input_path)
 
-    val_input_path = cfg.data_path + cfg.val_input
-    val_target_path = cfg.data_path + cfg.val_target
-    if not os.path.exists(cfg.data_path + cfg.val_input):
-        raise ValueError('Validation input path does not exist')
+    val_input_path = cfg.val_input
+    val_target_path = cfg.val_target
+    if not os.path.exists(cfg.val_input):
+        raise ValueError(f'Validation input path does not exist: {cfg.val_input}')
+    if not os.path.exists(cfg.val_target):
+        raise ValueError(f'Validation target path does not exist: {cfg.val_target}')
 
     #choose dataset class based on cfg.lazy_load
     # if cfg.lazy_load:
