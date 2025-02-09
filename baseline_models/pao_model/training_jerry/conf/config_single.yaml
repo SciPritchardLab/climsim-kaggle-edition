@@ -100,5 +100,5 @@ wandb:
 num_workers: 32
 
 # model hyperparameters
-num_hidden_seq: 128
-num_hidden_scalar: 128
+num_hidden_seq: 160
+num_hidden_scalar: 160

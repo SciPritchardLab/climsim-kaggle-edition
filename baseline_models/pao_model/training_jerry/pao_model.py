@@ -33,8 +33,8 @@ class pao_model_nn(modulus.Module):
                  input_scalar_num: int = 19, # number of input scalar
                  target_series_num: int = 5, # number of target series
                  target_scalar_num: int = 8, # number of target scalar
-                 hidden_series_num: int = 128, # number of hidden units in MLP for series
-                 hidden_scalar_num: int = 128, # number of hidden units in MLP for scalar
+                 hidden_series_num: int = 160, # number of hidden units in MLP for series
+                 hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
                 ):
@@ -86,7 +86,7 @@ class pao_model_nn(modulus.Module):
             nn.GELU(),
             nn.Linear(self.num_hidden_total, self.hidden_series_num),
             nn.GELU(),
-            nn.Linear(self.hidden_series_num, self.target_series_num)
+            nn.Linear(self.hidden_series_num, self.target_series_num * 2)
         )
         self.output_scalar_mlp_input_dim = self.num_hidden_total * 60
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
