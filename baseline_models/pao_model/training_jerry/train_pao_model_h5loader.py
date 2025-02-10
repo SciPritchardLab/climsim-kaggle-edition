@@ -32,21 +32,17 @@ import gc
 import random
 from soap import SOAP
 
-torch.set_float32_matmul_precision("high")
-# Set a fixed seed value
-seed = 43
-# For PyTorch
-torch.manual_seed(seed)
-# For CUDA if using GPU
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)  # if using multi-GPU
-# For other libraries
-np.random.seed(seed)
-random.seed(seed)
-
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
-
+    torch.set_float32_matmul_precision("high")
+    # For PyTorch
+    torch.manual_seed(cfg.seed)
+    # For CUDA if using GPU
+    torch.cuda.manual_seed(cfg.seed)
+    torch.cuda.manual_seed_all(cfg.seed)  # if using multi-GPU
+    # For other libraries
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
     DistributedManager.initialize()
     dist = DistributedManager()
 
@@ -350,10 +346,11 @@ def main(cfg: DictConfig) -> float:
                 #     target[:,120:120+cfg.strato_lev] = 0
                 #     target[:,180:180+cfg.strato_lev] = 0
                 data_input, target = data_input.to(device), target.to(device)
-                optimizer.zero_grad()
-                output = model(data_input)
-                loss = criterion(output, target)
-                loss.backward()
+                optimizer.zero_grad() # Clear gradients first
+                output = model(data_input) # Forward pass
+                loss = criterion(output, target) # Calculate loss
+                loss.backward() # Backward pass
+                optimizer.step() # Update weights
                 # optimizer.zero_grad()
                 # output = model(data_input)
                 # if cfg.do_energy_loss:

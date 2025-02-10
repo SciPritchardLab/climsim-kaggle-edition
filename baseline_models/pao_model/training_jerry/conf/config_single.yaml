@@ -39,6 +39,8 @@
 #    # launcher:
 #    #  n_jobs: 2
 
+seed: 43
+
 data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
 input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v6_pervar.nc'
@@ -59,7 +61,7 @@ output_prune: True
 strato_lev_out: 12
 batch_size: 1024
 epochs: 16
-learning_rate: 0.001
+learning_rate: 0.0001
 optimizer: 'adam'
 loss: 'huber'
 

@@ -14,7 +14,7 @@
 ##SBATCH --error=eo_%j.err
 
 cmd="python train_pao_model_h5loader.py --config-name=config_single \
-     seed=43 "
+     seed=45 "
 
 cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pao_model/training_jerry
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
