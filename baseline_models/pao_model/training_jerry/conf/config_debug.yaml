@@ -39,6 +39,8 @@
 #    # launcher:
 #    #  n_jobs: 2
 
+seed: 43
+
 data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
 input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v6_pervar.nc'
@@ -53,7 +55,7 @@ qinput_log: False
 restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'pao_model_debug_micro_lr'
+expname: 'pao_model_debug'
 
 output_prune: True
 strato_lev_out: 12

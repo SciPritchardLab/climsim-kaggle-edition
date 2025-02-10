@@ -32,21 +32,17 @@ import gc
 import random
 from soap import SOAP
 
-torch.set_float32_matmul_precision("high")
-# Set a fixed seed value
-seed = 43
-# For PyTorch
-torch.manual_seed(seed)
-# For CUDA if using GPU
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)  # if using multi-GPU
-# For other libraries
-np.random.seed(seed)
-random.seed(seed)
-
 @hydra.main(version_base="1.2", config_path="conf", config_name="config_debug")
 def main(cfg: DictConfig) -> float:
-
+    torch.set_float32_matmul_precision("high")
+    # For PyTorch
+    torch.manual_seed(cfg.seed)
+    # For CUDA if using GPU
+    torch.cuda.manual_seed(cfg.seed)
+    torch.cuda.manual_seed_all(cfg.seed)  # if using multi-GPU
+    # For other libraries
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
     DistributedManager.initialize()
     dist = DistributedManager()
 
