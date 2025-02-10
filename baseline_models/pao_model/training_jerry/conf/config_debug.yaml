@@ -53,13 +53,13 @@ qinput_log: False
 restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'pao_model_debug'
+expname: 'pao_model_debug_micro_lr'
 
 output_prune: True
 strato_lev_out: 12
 batch_size: 1024
 epochs: 16
-learning_rate: 0.001
+learning_rate: 0.0001
 optimizer: 'adam'
 loss: 'huber'
 
@@ -93,7 +93,7 @@ early_stop_step: -1
 
 logger: 'wandb'
 wandb:
-   project: "climsim3_allhands"
+   project: "climsim3_debugging"
    entity: "cbrain"
 
 num_workers: 32

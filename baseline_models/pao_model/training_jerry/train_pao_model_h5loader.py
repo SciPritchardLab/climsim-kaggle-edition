@@ -350,10 +350,11 @@ def main(cfg: DictConfig) -> float:
                 #     target[:,120:120+cfg.strato_lev] = 0
                 #     target[:,180:180+cfg.strato_lev] = 0
                 data_input, target = data_input.to(device), target.to(device)
-                optimizer.zero_grad()
-                output = model(data_input)
-                loss = criterion(output, target)
-                loss.backward()
+                optimizer.zero_grad() # Clear gradients first
+                output = model(data_input) # Forward pass
+                loss = criterion(output, target) # Calculate loss
+                loss.backward() # Backward pass
+                optimizer.step() # Update weights
                 # optimizer.zero_grad()
                 # output = model(data_input)
                 # if cfg.do_energy_loss:
