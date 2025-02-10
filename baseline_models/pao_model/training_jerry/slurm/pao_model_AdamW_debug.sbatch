@@ -13,8 +13,7 @@
 ##SBATCH --output=out_%j.out
 ##SBATCH --error=eo_%j.err
 
-cmd="python train_pao_model_h5loader_debug.py --config-name=config_debug \
-     seed=43 "
+cmd="python train_pao_model_h5loader_debug.py --config-name=config_AdamW_debug"
 
 cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pao_model/training_jerry
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
