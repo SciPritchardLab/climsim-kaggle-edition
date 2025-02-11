@@ -13,7 +13,7 @@
 #SBATCH --output=out_%j.out
 #SBATCH --error=eo_%j.err
 
-cmd="python train_resLSTM_h5loader.py --config-name=config_AdamW"
+cmd="python train_pure_resLSTM_h5loader.py --config-name=config_Adam"
 
-cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/resLSTM/training_jerry
+cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pure_resLSTM/training_jerry
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"

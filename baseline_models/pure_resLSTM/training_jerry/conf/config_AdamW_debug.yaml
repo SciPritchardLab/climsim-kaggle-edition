@@ -55,14 +55,14 @@ qinput_log: False
 restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'resLSTM_Adam_debug'
+expname: 'pure_resLSTM_AdamW_debug'
 
 output_prune: True
 strato_lev_out: 12
 batch_size: 1024
 epochs: 16
 learning_rate: 0.0001
-optimizer: 'Adam'
+optimizer: 'AdamW'
 loss: 'huber'
 
 save_top_ckpts: 15 
@@ -101,3 +101,5 @@ wandb:
 num_workers: 32
 
 # model hyperparameters
+num_lstm: 10
+hidden_state: 256
