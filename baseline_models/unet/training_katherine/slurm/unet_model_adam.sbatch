@@ -14,5 +14,6 @@
 #SBATCH --error=eo_%j.err
 
 cmd="python train_unet_h5loader_processed.py --config-name=config_adam"
+
 cd /global/cfs/cdirs/m4334/kfrields/climsim3/baseline_models/unet/training_katherine
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
