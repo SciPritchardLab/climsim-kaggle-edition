@@ -49,7 +49,7 @@ class pao_model_nn(modulus.Module):
         self.output_prune = output_prune
         self.strato_lev_out = strato_lev_out
         # 60 series 1d cnn
-        self.feature_scale = nn.ModuleList([
+        self.feature_scale_list = nn.ModuleList([
             FeatureScale(60) for _ in range(self.input_series_num)
         ])
         self.positional_encoding = nn.Embedding(60, self.hidden_series_num)
@@ -64,7 +64,7 @@ class pao_model_nn(modulus.Module):
             # nn.ReLU(),
             nn.GELU()
         )
-        self.other_feats_proj = nn.ModuleList([nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num) for _ in range(60)])
+        self.other_feats_proj_list = nn.ModuleList([nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num) for _ in range(60)])
         # layer norm
         self.layer_norm_in = self.num_hidden_total
         self.series_layer_norm = nn.LayerNorm(self.layer_norm_in)
@@ -102,32 +102,18 @@ class pao_model_nn(modulus.Module):
             nn.Linear(self.hidden_scalar_num, self.target_scalar_num)
         )
 
-    def reshape_input(self, x):
+    def forward(self, x):
+        # reshape input
         batch_size = x.size(0)
         series_part = x[:, :self.input_series_num*60]
         series_inputs = series_part.reshape(batch_size, self.input_series_num, 60)
         scalar_inputs = x[:, self.input_series_num*60:]
-        return series_inputs, scalar_inputs
-
-    def reshape_output(self, series_output, scalar_output):
-        batch_size = series_output.size(0)
-        series_part = series_output.reshape(batch_size, self.target_series_num * 60)
-        return torch.cat([series_part, scalar_output], dim = 1)
-    
-    def count_trainable_parameters(self):
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-    def forward(self, x):
-        series_inputs, scalar_inputs = self.reshape_input(x)
-        # create series_features
-        # create scalar_inputs
-        # concat dim60 cols
         dim60_x = []
-        scale_ix = 0
-        for group_ix in range((self.input_series_num)):
+        # scale_ix = 0
+        for group_ix, feature_scale in enumerate(self.feature_scale_list):
             origin_x = series_inputs[:, group_ix, :] # (batch, 60)
-            x = self.feature_scale[scale_ix](origin_x)  # (batch, 60)
-            scale_ix += 1
+            x = feature_scale(origin_x)  # (batch, 60)
+            # scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
             dim60_x.append(x)
             # # diff feature
@@ -155,8 +141,8 @@ class pao_model_nn(modulus.Module):
         scalar_x = scalar_inputs  # (batch, 19)
         scalar_x = self.other_feats_mlp(scalar_x)  # (batch, hidden)
         scalar_x_list = []
-        for i in range(60):
-            scalar_x_list.append(self.other_feats_proj[i](scalar_x))
+        for lev_idx, other_feats_proj in enumerate(self.other_feats_proj_list):
+            scalar_x_list.append(other_feats_proj(scalar_x))
         scalar_x = torch.stack(scalar_x_list, dim=1)  # (batch, 60, hidden)
         # repeat to match series_len
         # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, series_len, hidden)
@@ -175,7 +161,10 @@ class pao_model_nn(modulus.Module):
         x = x.reshape(x.size(0), -1)
         x = self.scalar_layer_norm(x)
         scalar_output = self.scalar_output_mlp(x)
-        y = self.reshape_output(series_output, scalar_output)
+        # Reshape output
+        series_part = series_output.reshape(batch_size, self.target_series_num * 60)
+        y = torch.cat([series_part, scalar_output], dim = 1)
+        # Prune output
         if self.output_prune:
             # Zeyuan says that the .clone() and .clone().zero_() helped bypass a torchscript issue. Reason unclear.
             y = y.clone()
@@ -184,7 +173,3 @@ class pao_model_nn(modulus.Module):
             y[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
             y[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
         return y
-
-if __name__ == '__main__':
-    model = pao_model()
-    print(model.count_trainable_parameters())
