@@ -64,7 +64,7 @@ restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus'
 #save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
 save_path: '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/'
-expname: 'v2rh_mc_fix_huber'
+expname: 'unet_Radam_debugging'
 
 qinput_prune: True
 qoutput_prune: True
@@ -80,7 +80,7 @@ input_clip_rhonly: True
 batch_size: 1024
 epochs: 16
 learning_rate: 0.0001
-optimizer: 'Adam'
+optimizer: 'RAdam'
 weight_decay: 0.00005
 loss: 'huber'
 dt_weight: 1.0
@@ -148,7 +148,7 @@ early_stop_step: -1
 
 logger: 'wandb'
 wandb:
-   project: "climsim3_allhands"
+   project: "climsim3_debugging"
    entity: "cbrain"
 
 mlflow:
