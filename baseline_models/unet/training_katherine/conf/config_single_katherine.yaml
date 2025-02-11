@@ -148,7 +148,7 @@ early_stop_step: -1
 
 logger: 'wandb'
 wandb:
-   project: "climsim3_allhands"
+   project: "climsim3_debugging"
    entity: "cbrain"
 
 mlflow:
