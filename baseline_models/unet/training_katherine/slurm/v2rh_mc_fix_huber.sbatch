@@ -8,10 +8,10 @@
 #SBATCH --gpus-per-node 4
 #SBATCH -n 1
 #SBATCH --image=nvcr.io/nvidia/modulus/modulus:24.01
-##SBATCH --mail-user=frieldskatherine@gmail.com
-##SBATCH --mail-type=ALL
-##SBATCH --output=out_%j.out
-##SBATCH --error=eo_%j.err
+#SBATCH --mail-user=frieldskatherine@gmail.com
+#SBATCH --mail-type=ALL
+#SBATCH --output=out_%j.out
+#SBATCH --error=eo_%j.err
 
 cmd="python train_unet_h5loader_processed.py --config-name=config_single_katherine"
 
