@@ -221,8 +221,12 @@ def main(cfg: DictConfig) -> float:
         torch.cuda.current_stream().wait_stream(ddps)
 
     # create optimizer
-    if cfg.optimizer == 'adam':
+    if cfg.optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    elif cfg.optimizer == 'AdamW':
+        optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
+    elif cfg.optimizer == 'RAdam':
+        optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
     else:
         raise ValueError('Optimizer not implemented')
     
