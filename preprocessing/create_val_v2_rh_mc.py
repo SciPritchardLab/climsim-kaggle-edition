@@ -3,14 +3,14 @@ import xarray as xr
 from climsim_utils.data_utils import *
 
 def main(regexps, save_path, start_idx):
-    grid_path = '/global/u2/z/zeyuanhu/nvidia_codes/Climsim_private/grid_info/ClimSim_low-res_grid-info.nc'
-    norm_path = '/global/u2/z/zeyuanhu/nvidia_codes/Climsim_private/preprocessing/normalizations/'
+    grid_path = '../grid_info/ClimSim_low-res_grid-info.nc'
+    norm_path = './normalizations/'
 
     grid_info = xr.open_dataset(grid_path)
-    input_mean = xr.open_dataset(norm_path + 'inputs/input_mean_adv_ne4_qlog.nc')
-    input_max = xr.open_dataset(norm_path + 'inputs/input_max_adv_ne4_qlog.nc')
-    input_min = xr.open_dataset(norm_path + 'inputs/input_min_adv_ne4_qlog.nc')
-    output_scale = xr.open_dataset(norm_path + 'outputs/output_scale_std.nc')
+    input_mean = xr.open_dataset(norm_path + 'inputs/input_mean_v6_pervar.nc') # v2_rh_mc is a subset of v6, which itself is a subset of v5
+    input_max = xr.open_dataset(norm_path + 'inputs/input_max_v6_pervar.nc') # v2_rh_mc is a subset of v6, which itself is a subset of v5
+    input_min = xr.open_dataset(norm_path + 'inputs/input_min_v6_pervar.nc') # v2_rh_mc is a subset of v6, which itself is a subset of v5
+    output_scale = xr.open_dataset(norm_path + 'outputs/output_scale_std_lowerthred_v6.nc') # v2_rh_mc is a subset of v6, which itself is a subset of v5
 
     data = data_utils(grid_info = grid_info, 
                     input_mean = input_mean, 
@@ -19,11 +19,11 @@ def main(regexps, save_path, start_idx):
                     output_scale = output_scale,
                     qinput_log = False,
                     normalize=False,
-                    input_abbrev='mlsolin',
+                    input_abbrev='ml2steploc',
                     output_abbrev='mlo') #!!!!!!! don't forget
 
-    data.data_path = '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/train/'
-    data.set_to_v4_vars()
+    data.data_path = '/pscratch/sd/z/zeyuanhu/hugging/E3SM-MMF_ne4/train/'
+    data.set_to_v2_rh_mc_vars()
 
     # if "," in regexps, then split it to a list of strings
     # regexps must be str,
@@ -33,13 +33,13 @@ def main(regexps, save_path, start_idx):
     # else:
     #     regexps = [regexps]
     print(regexps)
-    data.set_regexps(data_split='train', regexps=regexps)
-    data.set_stride_sample(data_split='train', stride_sample=2)
-    data.set_filelist(data_split='train', start_idx=start_idx)
+    data.set_regexps(data_split='val', regexps=regexps)
+    data.set_stride_sample(data_split='val', stride_sample=12)
+    data.set_filelist(data_split='val', start_idx=start_idx)
     #if savepath not exist, create it
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    data.save_as_npy(data_split='train', save_path=save_path)
+    data.save_as_npy(data_split='val', save_path=save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process E3SM-MMF data.')
@@ -49,4 +49,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args.regexps, args.save_path, args.start_idx)
-
