@@ -131,7 +131,7 @@ class data_utils:
         self.test_filelist = None
 
         self.full_vars = False
-        self.full_vars_v5 = False
+        self.microphysics_constraint = False
 
         # physical constants from E3SM_ROOT/share/util/shr_const_mod.F90
         self.grav    = 9.80616    # acceleration of gravity ~ m/s^2
@@ -787,7 +787,8 @@ class data_utils:
         self.input_vars = self.v2_rh_mc_inputs
         self.target_vars = self.v2_rh_mc_outputs
         self.ps_index = 360
-        self.full_vars = True
+        self.full_vars = False
+        self.microphysics_constraint = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
@@ -852,7 +853,7 @@ class data_utils:
         self.target_vars = self.v5_outputs
         self.ps_index = 1380
         self.full_vars = False
-        self.full_vars_v5 = True
+        self.microphysics_constraint = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
@@ -869,8 +870,7 @@ class data_utils:
         self.target_vars = self.v6_outputs
         self.ps_index = 1380
         self.full_vars = False
-        self.full_vars_v5 = True
-        self.full_vars_v6 = True
+        self.microphysics_constraint = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
@@ -967,7 +967,7 @@ class data_utils:
             ds_target['ptend_q0003'] = (ds_target['state_q0003'] - ds_input['state_q0003'])/1200 # Q tendency [kg/kg/s]
             ds_target['ptend_u'] = (ds_target['state_u'] - ds_input['state_u'])/1200 # U tendency [m/s/s]
             ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200 # V tendency [m/s/s]   
-        elif self.full_vars_v5:
+        elif self.microphysics_constraint:
             ds_target['ptend_qn'] = (ds_target['state_q0002'] - ds_input['state_q0002'] + ds_target['state_q0003'] - ds_input['state_q0003'])/1200
             ds_target['ptend_u'] = (ds_target['state_u'] - ds_input['state_u'])/1200 # U tendency [m/s/s]
             ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200
@@ -1469,7 +1469,7 @@ class data_utils:
         if just_weights:
             weightings = np.ones(output.shape)
 
-        if not self.full_vars and not self.full_vars_v5:
+        if not self.full_vars and not self.microphysics_constraint:
             ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             netsw = output[:,120].reshape((int(num_samples/self.num_latlon), self.num_latlon))
@@ -1491,7 +1491,7 @@ class data_utils:
                 soll_weight = weightings[:,365].reshape((int(num_samples/self.num_latlon), self.num_latlon))
                 solsd_weight = weightings[:,366].reshape((int(num_samples/self.num_latlon), self.num_latlon))
                 solld_weight = weightings[:,367].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-        elif self.full_vars_v5:
+        elif self.microphysics_constraint:
             ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_qn = output[:,120:180].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
@@ -1591,7 +1591,7 @@ class data_utils:
                     ptend_q0003_weight = ptend_q0003_weight/self.output_scale['ptend_q0003'].values[np.newaxis, np.newaxis, :]
                     ptend_u_weight = ptend_u_weight/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
                     ptend_v_weight = ptend_v_weight/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
-            if self.full_vars_v5:
+            if self.microphysics_constraint:
                 ptend_qn = ptend_qn/self.output_scale['ptend_qn'].values[np.newaxis, np.newaxis, :]
                 ptend_u = ptend_u/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
                 ptend_v = ptend_v/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
@@ -1628,7 +1628,7 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * dp/self.grav
                 ptend_u_weight = ptend_u_weight * dp/self.grav  
                 ptend_v_weight = ptend_v_weight * dp/self.grav
-        if self.full_vars_v5:
+        if self.microphysics_constraint:
             ptend_qn = ptend_qn * dp/self.grav
             ptend_u = ptend_u * dp/self.grav
             ptend_v = ptend_v * dp/self.grav
@@ -1670,7 +1670,7 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_u_weight = ptend_u_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_v_weight = ptend_v_weight * self.area_wgt[np.newaxis, :, np.newaxis]
-        if self.full_vars_v5:
+        if self.microphysics_constraint:
             ptend_qn = ptend_qn * self.area_wgt[np.newaxis, :, np.newaxis]
             ptend_u = ptend_u * self.area_wgt[np.newaxis, :, np.newaxis]
             ptend_v = ptend_v * self.area_wgt[np.newaxis, :, np.newaxis]
@@ -1712,7 +1712,7 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * self.target_energy_conv['ptend_q0003']
                 ptend_u_weight = ptend_u_weight * self.target_energy_conv['ptend_wind']
                 ptend_v_weight = ptend_v_weight * self.target_energy_conv['ptend_wind']
-        if self.full_vars_v5:
+        if self.microphysics_constraint:
             ptend_qn = ptend_qn * self.target_energy_conv['ptend_qn']
             ptend_u = ptend_u * self.target_energy_conv['ptend_wind']
             ptend_v = ptend_v * self.target_energy_conv['ptend_wind']
@@ -1738,7 +1738,7 @@ class data_utils:
                                              soll_weight.reshape((num_samples))[:, np.newaxis], \
                                              solsd_weight.reshape((num_samples))[:, np.newaxis], \
                                              solld_weight.reshape((num_samples))[:, np.newaxis]], axis = 1)
-            elif self.full_vars_v5:
+            elif self.microphysics_constraint:
                 weightings = np.concatenate([ptend_t_weight.reshape((num_samples, 60)), \
                                              ptend_q0001_weight.reshape((num_samples, 60)), \
                                              ptend_qn_weight.reshape((num_samples, 60)), \
@@ -1780,7 +1780,7 @@ class data_utils:
                 var_dict['ptend_q0003'] = ptend_q0003
                 var_dict['ptend_u'] = ptend_u
                 var_dict['ptend_v'] = ptend_v
-            if self.full_vars_v5:
+            if self.microphysics_constraint:
                 var_dict['ptend_qn'] = ptend_qn
                 var_dict['ptend_u'] = ptend_u
                 var_dict['ptend_v'] = ptend_v
