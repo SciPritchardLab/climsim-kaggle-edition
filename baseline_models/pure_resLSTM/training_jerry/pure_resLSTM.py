@@ -15,28 +15,36 @@ Contains the code for the resLSTM and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class resLSTM_metadata(modulus.ModelMetaData):
-    name: str = "resLSTM"
+class pure_resLSTM_metadata(modulus.ModelMetaData):
+    name: str = "pure_resLSTM"
     # Optimization
     jit: bool = True
     cuda_graphs: bool = True
     amp_cpu: bool = True
     amp_gpu: bool = True
 
-class resLSTM(modulus.Module):
+class pure_resLSTM_nn(modulus.Module):
     def __init__(
             self,
-            inputs_dim: int = 42, # number of sequences
-            num_lstm: int = 10,
-            hidden_state: int = 256,
-            strato_lev_out=12,
+            input_series_num: int = 9, # number of input series
+            input_scalar_num: int = 17, # number of input scalars
+            target_series_num: int = 5, # number of target series
+            target_scalar_num: int = 8, # number of target scalars
+            num_lstm: int = 10, # number of LSTM layers
+            hidden_state: int = 256, # number of hidden units in LSTM
+            output_prune: bool = True, # whether or not we prune strato_lev_out levels
+            strato_lev_out: int = 12, # number of levels to set to zero
             ):
-        
-        super().__init__(meta=resLSTM_metadata())
-        self.inputs_dim = inputs_dim
+        super().__init__(meta=pure_resLSTM_metadata())
+        self.input_series_num = input_series_num
+        self.input_scalar_num = input_scalar_num
+        self.target_series_num = target_series_num
+        self.target_scalar_num = target_scalar_num
+        self.inputs_dim = input_series_num + input_scalar_num
+        self.targets_dim = target_series_num + target_scalar_num
         self.num_lstm = num_lstm
         self.hidden_state = hidden_state
-        self.output_single_num = 8
+        self.output_prune = output_prune
         self.strato_lev_out = strato_lev_out
 
         residual_layers = nn.ModuleList()
@@ -55,7 +63,7 @@ class resLSTM(modulus.Module):
         self.lstm_stack = lstm_layers
         self.residual_stack = residual_layers
         self.fc = nn.Sequential(
-            nn.Linear(self.hidden_state*2, 13),
+            nn.Linear(self.hidden_state*2, self.targets_dim),
         )
         for name, p in self.named_parameters():
             if 'lstm' in name:
@@ -76,8 +84,11 @@ class resLSTM(modulus.Module):
                 elif 'bias' in name:
                     p.data.fill_(0)
                        
-    def forward(self, inputs):
-        outputs = inputs
+    def forward(self, x):
+        series_part = x[:,:self.input_series_num*60].reshape(-1,self.input_series_num,60).transpose(1,2)
+        scalar_part = x[:,self.input_series_num*60:].unsqueeze(1).repeat(1,60,1)
+        inputs_seq = torch.cat([series_part, scalar_part], dim = -1)
+        outputs = inputs_seq  # b,60,self.inputs_dim
         last_outputs = outputs
         # pass through LSTM layer by layer and apply residual connection
         for i, (lstm, residual) in enumerate(zip(self.lstm_stack.values(), self.residual_stack)):
@@ -89,19 +100,20 @@ class resLSTM(modulus.Module):
             else:  # i % 2 ==0
                 last_outputs = outputs  # save predictions of last two layers
 
-        outputs = self.fc(outputs)  # b,60,13
+        outputs = self.fc(outputs)  # b,60,self.targets_dim
 
-        series_part = outputs[:,:,self.output_single_num:]
+        series_part = outputs[:,:,self.target_scalar_num:]
         series_part = series_part.permute(0,2,1).reshape(-1,300) # b,300
-        single_part = outputs[:,:,:self.output_single_num]
+        single_part = outputs[:,:,:self.target_scalar_num]
         single_part = torch.mean(single_part, dim=1) # b,8
 
-        outputs = torch.concat([series_part, single_part], dim=1)
+        y = torch.concat([series_part, single_part], dim=1)
 
         if self.output_prune:
-            outputs = outputs.clone()
-            outputs[:, 60:60+self.strato_lev_out] = outputs[:, 60:60+self.strato_lev_out].clone().zero_()
-            outputs[:, 120:120+self.strato_lev_out] = outputs[:, 120:120+self.strato_lev_out].clone().zero_()
-            outputs[:, 180:180+self.strato_lev_out] = outputs[:, 180:180+self.strato_lev_out].clone().zero_()
-            outputs[:, 240:240+self.strato_lev_out] = outputs[:, 240:240+self.strato_lev_out].clone().zero_()
-        return outputs
+            # Zeyuan says that the .clone() and .clone().zero_() helped bypass a torchscript issue. Reason unclear.
+            y = y.clone()
+            y[:, 60:60+self.strato_lev_out] = y[:, 60:60+self.strato_lev_out].clone().zero_()
+            y[:, 120:120+self.strato_lev_out] = y[:, 120:120+self.strato_lev_out].clone().zero_()
+            y[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
+            y[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
+        return y
