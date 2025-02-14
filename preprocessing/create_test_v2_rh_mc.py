@@ -18,11 +18,11 @@ def main(regexps, save_path, start_idx):
                     input_min = input_min, 
                     output_scale = output_scale,
                     qinput_log = False,
-                    normalize=False,
+                    normalize = False,
                     input_abbrev='ml2steploc',
                     output_abbrev='mlo') #!!!!!!! don't forget
 
-    data.data_path = '/pscratch/sd/z/zeyuanhu/hugging/E3SM-MMF_ne4/_test/'
+    data.data_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/_test/'
     data.set_to_v2_rh_mc_vars()
 
     # if "," in regexps, then split it to a list of strings
@@ -39,7 +39,7 @@ def main(regexps, save_path, start_idx):
     #if savepath not exist, create it
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    data.save_as_npy(data_split='test', save_path=save_path)
+    data.save_as_npy(data_split='test', save_path = save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process E3SM-MMF data.')
