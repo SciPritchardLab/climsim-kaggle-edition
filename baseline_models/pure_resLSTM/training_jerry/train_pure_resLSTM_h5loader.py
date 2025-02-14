@@ -22,8 +22,8 @@ from climsim_utils.data_utils import *
 from climsim_datapip_processed import climsim_dataset_processed
 from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
 
-from resLSTM import resLSTM_nn
-import resLSTM as resLSTM
+from pure_resLSTM import pure_resLSTM_nn
+import pure_resLSTM as pure_resLSTM
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
@@ -153,13 +153,13 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    model = resLSTM_nn(
+    model = pure_resLSTM_nn(
             input_series_num = data.input_series_num,
             input_scalar_num = data.input_scalar_num,
             target_series_num = data.target_series_num,
             target_scalar_num = data.target_scalar_num,
-            hidden_series_num = cfg.hidden_series_num,
-            hidden_scalar_num = cfg.hidden_scalar_num,
+            num_lstm = cfg.num_lstm,
+            hidden_state = cfg.hidden_state,
             output_prune = cfg.output_prune,
             strato_lev_out = cfg.strato_lev_out,
             ).to(dist.device)
@@ -468,7 +468,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        resLSTM.device = "cpu"
+        pure_resLSTM.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)

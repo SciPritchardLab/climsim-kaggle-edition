@@ -30,9 +30,9 @@ class pao_model_metadata(modulus.ModelMetaData):
 class pao_model_nn(modulus.Module):
     def __init__(self,
                  input_series_num: int = 9, # number of input series
-                 input_scalar_num: int = 17, # number of input scalar
+                 input_scalar_num: int = 17, # number of input scalars
                  target_series_num: int = 5, # number of target series
-                 target_scalar_num: int = 8, # number of target scalar
+                 target_scalar_num: int = 8, # number of target scalars
                  hidden_series_num: int = 160, # number of hidden units in MLP for series
                  hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
