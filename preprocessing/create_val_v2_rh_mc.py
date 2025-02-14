@@ -22,7 +22,7 @@ def main(regexps, save_path, start_idx):
                     input_abbrev='ml2steploc',
                     output_abbrev='mlo') #!!!!!!! don't forget
 
-    data.data_path = '/pscratch/sd/z/zeyuanhu/hugging/E3SM-MMF_ne4/train/'
+    data.data_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/train/'
     data.set_to_v2_rh_mc_vars()
 
     # if "," in regexps, then split it to a list of strings
