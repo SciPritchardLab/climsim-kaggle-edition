@@ -39,13 +39,14 @@
 #    # launcher:
 #    #  n_jobs: 2
 
-climsim_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/'
+seed: 43
+
 data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
-input_mean: 'inputs/input_mean_v6_pervar.nc'
-input_max: 'inputs/input_max_v6_pervar.nc'
-input_min: 'inputs/input_min_v6_pervar.nc'
-output_scale: 'outputs/output_scale_std_lowerthred_v6.nc'
+input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v6_pervar.nc'
+input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v6_pervar.nc'
+input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v6_pervar.nc'
+output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v6.nc'
 
 val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_input.npy'
 val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_target.npy'
@@ -54,14 +55,14 @@ qinput_log: False
 restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'pao_model'
+expname: 'pao_model_AdamW'
 
 output_prune: True
 strato_lev_out: 12
 batch_size: 1024
 epochs: 16
 learning_rate: 0.0001
-optimizer: 'adam'
+optimizer: 'AdamW'
 loss: 'huber'
 
 save_top_ckpts: 15 
@@ -100,5 +101,5 @@ wandb:
 num_workers: 32
 
 # model hyperparameters
-num_hidden_seq: 128
-num_hidden_scalar: 128
+hidden_series_num: 160
+hidden_scalar_num: 160

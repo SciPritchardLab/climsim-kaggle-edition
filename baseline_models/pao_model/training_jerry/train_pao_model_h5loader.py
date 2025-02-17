@@ -32,31 +32,25 @@ import gc
 import random
 from soap import SOAP
 
-torch.set_float32_matmul_precision("high")
-# Set a fixed seed value
-seed = 43
-# For PyTorch
-torch.manual_seed(seed)
-# For CUDA if using GPU
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)  # if using multi-GPU
-# For other libraries
-np.random.seed(seed)
-random.seed(seed)
-
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
-
+    torch.set_float32_matmul_precision("high")
+    # For PyTorch
+    torch.manual_seed(cfg.seed)
+    # For CUDA if using GPU
+    torch.cuda.manual_seed(cfg.seed)
+    torch.cuda.manual_seed_all(cfg.seed)  # if using multi-GPU
+    # For other libraries
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
     DistributedManager.initialize()
     dist = DistributedManager()
 
-    grid_path = os.path.join(cfg.climsim_path, '/grid_info/ClimSim_low-res_grid-info.nc')
-    norm_path = os.path.join(cfg.climsim_path, '/preprocessing/normalizations/')
-    grid_info = xr.open_dataset(grid_path)
-    input_mean = xr.open_dataset(os.path.join(norm_path, cfg.input_mean))
-    input_max = xr.open_dataset(os.path.join(norm_path, cfg.input_max))
-    input_min = xr.open_dataset(os.path.join(norm_path, cfg.input_min))
-    output_scale = xr.open_dataset(os.path.join(norm_path, cfg.output_scale))
+    grid_info = xr.open_dataset(cfg.grid_info)
+    input_mean = xr.open_dataset(cfg.input_mean)
+    input_max = xr.open_dataset(cfg.input_max)
+    input_min = xr.open_dataset(cfg.input_min)
+    output_scale = xr.open_dataset(cfg.output_scale)
 
     data = data_utils(grid_info = grid_info, 
                   input_mean = input_mean, 
@@ -103,10 +97,12 @@ def main(cfg: DictConfig) -> float:
 
     # print(train_input_path)
 
-    val_input_path = cfg.data_path + cfg.val_input
-    val_target_path = cfg.data_path + cfg.val_target
-    if not os.path.exists(cfg.data_path + cfg.val_input):
-        raise ValueError('Validation input path does not exist')
+    val_input_path = cfg.val_input
+    val_target_path = cfg.val_target
+    if not os.path.exists(cfg.val_input):
+        raise ValueError(f'Validation input path does not exist: {cfg.val_input}')
+    if not os.path.exists(cfg.val_target):
+        raise ValueError(f'Validation target path does not exist: {cfg.val_target}')
 
     #choose dataset class based on cfg.lazy_load
     # if cfg.lazy_load:
@@ -157,18 +153,15 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    tmp_output_prune = cfg.output_prune
-    tmp_strato_lev = cfg.strato_lev_out
-
     model = pao_model_nn(
-            num_seq_inputs = data.input_series_num,
-            num_scalar_inputs = data.input_scalar_num,
-            num_seq_targets = data.target_series_num,
-            num_scalar_targets = data.target_scalar_num,
-            num_hidden_seq = cfg.num_hidden_seq,
-            num_hidden_scalar = cfg.num_hidden_scalar,
-            output_prune = tmp_output_prune,
-            strato_lev = tmp_strato_lev,
+            input_series_num = data.input_series_num,
+            input_scalar_num = data.input_scalar_num,
+            target_series_num = data.target_series_num,
+            target_scalar_num = data.target_scalar_num,
+            hidden_series_num = cfg.hidden_series_num,
+            hidden_scalar_num = cfg.hidden_scalar_num,
+            output_prune = cfg.output_prune,
+            strato_lev_out = cfg.strato_lev_out,
             ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -203,13 +196,13 @@ def main(cfg: DictConfig) -> float:
         torch.cuda.current_stream().wait_stream(ddps)
 
     # create optimizer
-    if cfg.optimizer == 'adam':
+    if cfg.optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    if cfg.optimizer == 'AdamW':
+    elif cfg.optimizer == 'AdamW':
         optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    if cfg.optimizer == 'RAdam':
+    elif cfg.optimizer == 'RAdam':
         optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
-    if cfg.optimizer == 'SOAP':
+    elif cfg.optimizer == 'SOAP':
         optimizer = SOAP(model.parameters(), lr = cfg.learning_rate, betas=(.95, .95), weight_decay=.01, precondition_frequency=10)
     else:
         raise ValueError('Optimizer not implemented')
@@ -340,7 +333,7 @@ def main(cfg: DictConfig) -> float:
         #                           num_workers=cfg.num_workers)
         # wrap the epoch in launch logger to control frequency of output for console logs
         with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=10) as launchlog:
-            # model.train()
+            model.train()
             # Wrap train_loader with tqdm for a progress bar
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
@@ -353,10 +346,11 @@ def main(cfg: DictConfig) -> float:
                 #     target[:,120:120+cfg.strato_lev] = 0
                 #     target[:,180:180+cfg.strato_lev] = 0
                 data_input, target = data_input.to(device), target.to(device)
-                optimizer.zero_grad()
-                output = eval_step_forward(model, data_input)
-                loss = criterion(output, target)
-                loss.backward()
+                optimizer.zero_grad() # Clear gradients first
+                output = model(data_input) # Forward pass
+                loss = criterion(output, target) # Calculate loss
+                loss.backward() # Backward pass
+                optimizer.step() # Update weights
                 # optimizer.zero_grad()
                 # output = model(data_input)
                 # if cfg.do_energy_loss:
@@ -392,7 +386,7 @@ def main(cfg: DictConfig) -> float:
                 current_step += 1
             #launchlog.log_epoch({"Learning Rate": optimizer.param_groups[0]["lr"]})
             
-            # model.eval()
+            model.eval()
             val_loss = 0.0
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')

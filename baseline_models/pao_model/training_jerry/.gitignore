@@ -1,0 +1,4 @@
+# Ignore specific folders
+wandb/
+__pycache__/
+outputs/
