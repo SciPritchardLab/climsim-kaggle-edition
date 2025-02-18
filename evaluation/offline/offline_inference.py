@@ -103,17 +103,12 @@ for model_name in model_paths.keys():
         for i in tqdm(range(0, torch_input.shape[0], batch_size)):
             model_batch_pred = model(torch_input[i : i + batch_size, :]) # inference on batch
             model_batch_pred_list.append(model_batch_pred.cpu().numpy() / out_scale)
-            if i > 3840: # this is temporary, remove in final code
-                break # this is temporary, remove in final code
     model_preds[model_name] = np.stack(model_batch_pred_list, axis = 0) # 0 axis corresponds to time
     np.save(f'{model_name}_preds.npy', model_preds[model_name])
     
     del model
     del model_batch_pred_list
     gc.collect()
-
-reshaped_target = reshaped_target[:12,...] # this is temporary, remove this later
-pressures_binned = pressures_binned[:12,...] # this is temporary, remove this later
 
 def show_r2(target, preds):
     assert target.shape == preds.shape
@@ -160,36 +155,40 @@ for model_name in model_paths.keys():
                                                                       model_preds[model_name][:,:,:60]))[0]
     zonal_moistening_r2[model_name] = data.zonal_bin_weight_3d(get_coeff(reshaped_target[:,:,60:120], \
                                                                           model_preds[model_name][:,:,60:120]))[0]
+
 fig, ax = plt.subplots(2, num_models, figsize = (num_models*12, 18))
 y = np.arange(60)
 X, Y = np.meshgrid(np.sin(np.pi*lat_bin_mids/180), y)
-for i, model_name in enumerate(model_paths.keys()):
+Y = (1/100) * np.mean(pressures_binned, axis = 0).T
+for i, model_name in enumerate(['pure_resLSTM', 'pao_model']):
     contour_plot_heating = ax[0,i].pcolor(X, Y, zonal_heating_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1)
     ax[0,i].contour(X, Y, zonal_heating_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
     ax[0,i].contour(X, Y, zonal_heating_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
     ax[0,i].set_ylim(ax[0,i].get_ylim()[::-1])
-    ax[0,i].set_title(f'{model_name} - heating')
+    ax[0,i].set_title(f'{model_labels[model_name]} (heating)', fontsize = 20)
+    ax[0,i].set_xticks([])
     contour_plot = ax[1,i].pcolor(X, Y, zonal_moistening_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1) # pcolormesh
     ax[1,i].contour(X, Y, zonal_moistening_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
     ax[1,i].contour(X, Y, zonal_moistening_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
     ax[1,i].set_ylim(ax[1,i].get_ylim()[::-1])
-    ax[1,i].set_title(f'{model_name} - moistening')
+    ax[1,i].set_title(f'{model_labels[model_name]} (moistening)', fontsize = 20)
     ax[1,i].xaxis.set_ticks([np.sin(-50/180*np.pi), 0, np.sin(50/180*np.pi)])
-    ax[1,i].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'])
+    ax[1,i].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'], fontsize = 16)
     ax[1,i].xaxis.set_tick_params(width = 2)
     if i != 0:
         ax[0,i].set_yticks([])
         ax[1,i].set_yticks([])
-ax[0,0].set_ylabel("Pressure [hPa]")
+ax[0,0].set_ylabel("Pressure [hPa]", fontsize = 22)
 ax[0,0].yaxis.set_label_coords(-0.2,-0.09) # (-1.38,-0.09)
+ax[0,0].yaxis.set_tick_params(labelsize = 14)
+ax[1,0].yaxis.set_tick_params(labelsize = 14)
 ax[0,0].yaxis.set_ticks([1000,800,600,400,200,0])
 ax[1,0].yaxis.set_ticks([1000,800,600,400,200,0])
 fig.subplots_adjust(right=0.8)
 cbar_ax = fig.add_axes([0.82, 0.12, 0.02, 0.76])
 cb = fig.colorbar(contour_plot, cax=cbar_ax)
-cb.set_label("Skill Score "+r'$\left(\mathrm{R^{2}}\right)$',labelpad=50.1)
-plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.97)
-plt.subplots_adjust(hspace=0.13)
-plt.show()
+cb.set_label("Skill Score "+r'$\left(\mathrm{R^{2}}\right)$',labelpad=50.1, fontsize = 20)
+plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.97, fontsize = 22)
+plt.subplots_adjust(hspace=0.1)
 plt.savefig(preds_path + 'press_lat_r2_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
 plt.clf()
