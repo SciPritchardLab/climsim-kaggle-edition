@@ -101,7 +101,8 @@ for model_name in model_paths.keys():
     batch_size = data.num_latlon
     with torch.no_grad():
         for i in tqdm(range(0, torch_input.shape[0], batch_size)):
-            model_batch_pred = model(torch_input[i : i + batch_size, :]) # inference on batch
+            batch = torch_input[i : i + batch_size, :].to(device)
+            model_batch_pred = model(batch) # inference on batch
             model_batch_pred_list.append(model_batch_pred.cpu().numpy() / out_scale)
     model_preds[model_name] = np.stack(model_batch_pred_list, axis = 0) # 0 axis corresponds to time
     np.save(f'{model_name}_preds.npy', model_preds[model_name])
@@ -111,7 +112,7 @@ for model_name in model_paths.keys():
     gc.collect()
 
 def show_r2(target, preds):
-    assert target.shape == preds.shape
+    assert target.shape == preds.shape, f'target shape {target.shape} does not match preds shape {preds.shape}'
     new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
     target_flattened = target.reshape(new_shape)
     preds_flattened = preds.reshape(new_shape)
@@ -160,7 +161,7 @@ fig, ax = plt.subplots(2, num_models, figsize = (num_models*12, 18))
 y = np.arange(60)
 X, Y = np.meshgrid(np.sin(np.pi*lat_bin_mids/180), y)
 Y = (1/100) * np.mean(pressures_binned, axis = 0).T
-for i, model_name in enumerate(['pure_resLSTM', 'pao_model']):
+for i, model_name in enumerate(model_paths.keys()):
     contour_plot_heating = ax[0,i].pcolor(X, Y, zonal_heating_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1)
     ax[0,i].contour(X, Y, zonal_heating_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
     ax[0,i].contour(X, Y, zonal_heating_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
