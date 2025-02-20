@@ -432,9 +432,4 @@ class ClimsimUnet(modulus.Module):
 
         return y
     
-    def count_trainable_parameters(self):
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-    if __name__ == '__main__':
-        model = ClimsimUnet()
-        print(model.count_trainable_parameters())
+    
