@@ -105,7 +105,7 @@ for model_name in model_paths.keys():
             model_batch_pred = model(batch) # inference on batch
             model_batch_pred_list.append(model_batch_pred.cpu().numpy() / out_scale)
     model_preds[model_name] = np.stack(model_batch_pred_list, axis = 0) # 0 axis corresponds to time
-    np.save(f'{model_name}_preds.npy', model_preds[model_name])
+    np.save(preds_path + f'{model_name}_preds.npy', model_preds[model_name])
     
     del model
     del model_batch_pred_list
