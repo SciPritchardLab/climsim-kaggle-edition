@@ -96,7 +96,7 @@ def preprocessing_v2_rh_mc(data, input_path, target_path):
     reshaped_target = npy_target.reshape(-1, data.num_latlon, data.target_feature_len)
     return torch_input, reshaped_target, pressures_binned
 
-
+torch_input, reshaped_target, pressures_binned = preprocessing_v2_rh_mc(data, input_path, target_path)
 
 
 # model inference
