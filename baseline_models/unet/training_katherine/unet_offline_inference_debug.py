@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 import torch
 import os, gc
 from climsim_utils.data_utils import *
@@ -30,8 +30,20 @@ num_models = len(model_paths)
 model_preds = {}
 r2_scores = {}
 r2_scores_capped = {}
+
 zonal_heating_r2 = {}
 zonal_moistening_r2 = {}
+
+rmse_scores = {}
+rmse_scores_capped = {}
+zonal_heating_rmse = {}
+zonal_moistening_rmse = {}
+
+
+bias_scores = {}
+bias_scores_capped = {}
+zonal_heating_bias = {}
+zonal_moistening_bias = {}
 
 input_mean_file = 'inputs/input_mean_v6_pervar.nc'
 input_max_file = 'inputs/input_max_v6_pervar.nc'
@@ -151,7 +163,8 @@ plt.grid(True)
 # Show the plot
 plt.tight_layout()
 plt.savefig(output_save_path + 'unet_r2_lines.png')
-#plt.clf()
+plt.clf()
+#plt.show()
 
 
 def get_coeff(target, pred):
@@ -162,14 +175,10 @@ def get_coeff(target, pred):
     coeff[mask] = 1.0 * (rss[mask] == 0) 
     return coeff
 
-
 for model_name in model_paths.keys():
     zonal_heating_r2[model_name] = data.zonal_bin_weight_3d(get_coeff(reshaped_target[:,:,:60],model_preds[model_name][:,:,:60]))[0]
     zonal_moistening_r2[model_name] = data.zonal_bin_weight_3d(get_coeff(reshaped_target[:,:,60:120], model_preds[model_name][:,:,60:120]))[0]
   
-
-
-
 
 
 fig, ax = plt.subplots(2, num_models, figsize = (num_models*12, 18))
@@ -208,6 +217,254 @@ plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.9
 plt.subplots_adjust(hspace=0.1)
 plt.savefig(output_save_path + 'unet_press_lat_r2_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
 plt.clf()
+
+
+
+
+def show_rmse(target, preds):
+    assert target.shape == preds.shape
+    new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
+    target_flattened = target.reshape(new_shape)
+    preds_flattened = preds.reshape(new_shape)
+    #print(preds_flattened.shape)
+    rmse_scores = np.array([np.sqrt(mean_squared_error(target_flattened[:, i], preds_flattened[:, i])) for i in range(308)])
+    #rint(rmse_scores.shape)
+    rmse_scores_capped = rmse_scores.copy()
+    rmse_scores_capped[rmse_scores_capped < 0] = 0
+    return rmse_scores, rmse_scores_capped
+
+
+feature_indices = [0, 60, 120, 180, 240, 300, 308]
+
+fig, ax = plt.subplots(5, figsize = (10,15))
+for model_name in model_paths.keys():
+    rmse_scores[model_name], rmse_scores_capped[model_name] = show_rmse(reshaped_target, model_preds[model_name])
+    label_text = f'{model_labels[model_name]}: {np.mean(rmse_scores[model_name]):.3g}' 
+
+    for feature_i in range(5):
+        starting_index = feature_indices[feature_i]
+        ending_index = feature_indices[feature_i + 1]
+        xaxis = np.arange(ending_index - starting_index)
+        ax[feature_i].plot(xaxis, rmse_scores[model_name][starting_index: ending_index], color = model_colors[model_name], label=f"{label_text}")
+
+    
+feature_labels = ['dT', 'dQv', 'dQn (liq+ice)', 'dU', 'dV']
+feature_units = ['(K/s)', '(kg/kg/s)', '(kg/kg/s)', '(m/$s^2$)', '(m/$s^2$)']
+for feature_i in range(5):
+    ax[feature_i].set_title(f'{feature_labels[feature_i]}')
+    ax[feature_i].set_ylabel(f'RMSE {feature_units[feature_i]}')
+    ax[feature_i].legend()
+    
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_rmse_lines.png')
+#plt.show()
+plt.clf()
+
+
+
+fig, ax = plt.subplots(4,2, figsize = (8,15))
+scalar_start_index = 300
+scalar_labels = ['cam_out_NETSW','cam_out_FLWDS','cam_out_PRECSC', 'cam_out_PRECC','cam_out_SOLS','cam_out_SOLL', 'cam_out_SOLSD','cam_out_SOLLD']
+scalar_units = ['W/$m^2$', 'W/$m^2$', 'm/s', 'm/s', 'w/$m^2$', 'w/$m^2$', 'w/$m^2$', 'w/$m^2$']
+models =  model_paths.keys()
+
+for scalar_i, scalar_name in enumerate(scalar_labels):
+    scalar_rmse = []
+    
+    for model_i, model_name in enumerate(models):
+        scalar_rmse.append(rmse_scores[model_name][scalar_start_index + scalar_i])
+    #bar_colors = ['tab:blue', 'tab:red', 'tab:green']
+    bar_colors = model_colors.values()
+    ax[scalar_i//2][scalar_i%2].bar(models, scalar_rmse, color = bar_colors)
+    ax[scalar_i//2][scalar_i%2].set_title(scalar_name)
+    ax[scalar_i//2][scalar_i%2].set_ylabel(f'RMSE ({scalar_units[scalar_i]})')
+    ax[scalar_i//2][scalar_i%2].tick_params(axis='x', labelrotation=90)
+    
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_rmse_scalar_bars.png')
+#plt.show()
+plt.clf()
+
+
+
+
+
+def get_rmse_coeff(target, pred):
+    n = target.shape[0]
+    num = np.sum((target - np.mean(target, axis = 0)[None,:,:])**2, axis = 0)
+    coeff = np.sqrt(np.divide(num,n))
+    return coeff
+
+
+for model_name in model_paths.keys():
+    zonal_heating_rmse[model_name] = data.zonal_bin_weight_3d(get_rmse_coeff(reshaped_target[:,:,:60],model_preds[model_name][:,:,:60]))[0]
+    zonal_moistening_rmse[model_name] = data.zonal_bin_weight_3d(get_rmse_coeff(reshaped_target[:,:,60:120], model_preds[model_name][:,:,60:120]))[0]
+  
+fig, ax = plt.subplots(2, num_models, figsize = (num_models*12, 18))
+y = np.arange(60)
+X, Y = np.meshgrid(np.sin(np.pi*lat_bin_mids/180), y)
+Y = (1/100) * np.mean(pressures_binned, axis = 0).T
+for i, model_name in enumerate(model_paths.keys()):
+    contour_plot_heating = ax[0,i].pcolor(X, Y, zonal_heating_rmse[model_name].T, cmap='Reds')
+    #ax[0,i].contour(X, Y, zonal_heating_rmse[model_name].T, [0.7], colors='orange', linewidths=[4])
+    #ax[0,i].contour(X, Y, zonal_heating_rmse[model_name].T, [0.9], colors='yellow', linewidths=[4])
+    ax[0,i].set_ylim(ax[0,i].get_ylim()[::-1])
+    ax[0,i].set_title(f'{model_labels[model_name]} (heating)', fontsize = 20)
+    ax[0,i].set_xticks([])
+    contour_plot_cooling = ax[1,i].pcolor(X, Y, zonal_moistening_rmse[model_name].T, cmap='Blues') # pcolormesh
+    #ax[1,i].contour(X, Y, zonal_moistening_rmse[model_name].T, [0.7], colors='orange', linewidths=[4])
+    #ax[1,i].contour(X, Y, zonal_moistening_rmse[model_name].T, [0.9], colors='yellow', linewidths=[4])
+    ax[1,i].set_ylim(ax[1,i].get_ylim()[::-1])
+    ax[1,i].set_title(f'{model_labels[model_name]} (moistening)', fontsize = 20)
+    ax[1,i].xaxis.set_ticks([np.sin(-50/180*np.pi), 0, np.sin(50/180*np.pi)])
+    ax[1,i].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'], fontsize = 16)
+    ax[1,i].xaxis.set_tick_params(width = 2)
+    if i != 0:
+        ax[0,i].set_yticks([])
+        ax[1,i].set_yticks([])
+ax[0,0].set_ylabel("Pressure [hPa]", fontsize = 22)
+ax[0,0].yaxis.set_label_coords(-0.2,-0.09) # (-1.38,-0.09)
+ax[0,0].yaxis.set_tick_params(labelsize = 14)
+ax[1,0].yaxis.set_tick_params(labelsize = 14)
+ax[0,0].yaxis.set_ticks([1000,800,600,400,200,0])
+ax[1,0].yaxis.set_ticks([1000,800,600,400,200,0])
+fig.subplots_adjust(right=0.8)
+#acbar_ax = fig.add_axes([0.82, 0.12, 0.02, 0.76])
+#cbh = fig.colorbar(contour_plot_heating, cax=cbar_ax)
+cbh = fig.colorbar(contour_plot_heating)
+cbc = fig.colorbar(contour_plot_cooling)
+cbh.set_label("Skill Score "+r'$\left(\mathrm{RMSE}\right)$ (K/s)',labelpad=50.1, fontsize = 20)
+cbc.set_label("Skill Score "+r'$\left(\mathrm{RMSE}\right)$ (kg/kg/s)',labelpad=50.1, fontsize = 20)
+plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.97, fontsize = 22)
+plt.subplots_adjust(hspace=0.1)
+plt.savefig(output_save_path + 'unet_press_lat_rmse_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
+
+
+
+def show_bias(target, preds):
+    assert target.shape == preds.shape
+    new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
+    target_flattened = target.reshape(new_shape)
+    preds_flattened = preds.reshape(new_shape)
+    #print(preds_flattened.shape)
+    #bias_scores = np.array([(np.mean(preds[:,:, i], axis = 0)-np.mean(target[:,:, i], axis = 0)) for i in range(308)])
+    bias_scores = np.subtract(np.mean(preds_flattened, axis = 0), np.mean(target_flattened, axis = 0))
+    #print(bias_scores.shape)
+    bias_scores_capped = bias_scores.copy()
+    bias_scores_capped[bias_scores_capped < 0] = 0
+    return bias_scores, bias_scores_capped
+
+feature_indices = [0, 60, 120, 180, 240, 300, 308]
+
+fig, ax = plt.subplots(5, figsize = (10,15))
+for model_name in model_paths.keys():
+    bias_scores[model_name], bias_scores_capped[model_name] = show_bias(reshaped_target, model_preds[model_name])
+    label_text = f'{model_labels[model_name]}: {np.mean(bias_scores[model_name]):.3g}' 
+
+    for feature_i in range(5):
+        starting_index = feature_indices[feature_i]
+        ending_index = feature_indices[feature_i + 1]
+        xaxis = np.arange(ending_index - starting_index)
+        ax[feature_i].plot(xaxis, bias_scores[model_name][starting_index: ending_index], color = model_colors[model_name], label=f"{label_text}")
+
+feature_labels = ['dT', 'dQv', 'dQn (liq+ice)', 'dU', 'dV']
+feature_units = ['(K/s)', '(kg/kg/s)', '(kg/kg/s)', '(m/$s^2$)', '(m/$s^2$)']
+
+for feature_i in range(5):
+    ax[feature_i].set_title(f'{feature_labels[feature_i]}')
+    ax[feature_i].set_ylabel(f'BIAS {feature_units[feature_i]}')
+    ax[feature_i].legend()
+
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_bias_lines.png')
+#plt.show()
+plt.clf()
+
+
+fig, ax = plt.subplots(4,2, figsize = (12,15))
+scalar_start_index = 300
+scalar_labels = ['cam_out_NETSW','cam_out_FLWDS','cam_out_PRECSC', 'cam_out_PRECC','cam_out_SOLS','cam_out_SOLL', 'cam_out_SOLSD','cam_out_SOLLD']
+scalar_units = ['W/$m^2$', 'W/$m^2$', 'm/s', 'm/s', 'w/$m^2$', 'w/$m^2$', 'w/$m^2$', 'w/$m^2$']
+
+models =  model_paths.keys()
+
+for scalar_i, scalar_name in enumerate(scalar_labels):
+    scalar_bias = []
+    
+    for model_i, model_name in enumerate(models):
+        scalar_bias.append(bias_scores[model_name][scalar_start_index + scalar_i])
+    #bar_colors = ['tab:blue', 'tab:red', 'tab:green']
+    bar_colors = model_colors.values()
+    bar_labels = bar_labels = model_colors.keys()
+    ax[scalar_i//2][scalar_i%2].bar(models, scalar_bias, width = .5,label = bar_labels, color = bar_colors)
+    ax[scalar_i//2][scalar_i%2].set_title(scalar_name)
+    ax[scalar_i//2][scalar_i%2].set_xticklabels([])
+    ax[scalar_i//2][scalar_i%2].set_ylabel(f'Bias ({scalar_units[scalar_i]})')
+    ax[scalar_i//2][scalar_i%2].spines['bottom'].set_position('center')
+    ax[scalar_i//2][scalar_i%2].spines['bottom'].set_position(('data', 0))
+
+    ax[scalar_i//2][scalar_i%2].legend()
+    
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_bias_scalar_bars.png')
+#plt.show()
+plt.clf()
+
+
+def get_bias_coeff(target, pred):
+    coeff = np.subtract(np.mean(pred, axis = 0), np.mean(target, axis = 0))
+    #num = np.sum((target - np.mean(target, axis = 0)[None,:,:])**2, axis = 0)
+    #coeff = np.sqrt(np.divide(num,n))
+    #print(coeff.shape)
+    return coeff
+
+
+for model_name in model_paths.keys():
+    zonal_heating_bias[model_name] = data.zonal_bin_weight_3d(get_bias_coeff(reshaped_target[:,:,:60],model_preds[model_name][:,:,:60]))[0]
+    zonal_moistening_bias[model_name] = data.zonal_bin_weight_3d(get_bias_coeff(reshaped_target[:,:,60:120], model_preds[model_name][:,:,60:120]))[0]
+  
+
+fig, ax = plt.subplots(2, num_models, figsize = (num_models*12, 18))
+y = np.arange(60)
+X, Y = np.meshgrid(np.sin(np.pi*lat_bin_mids/180), y)
+Y = (1/100) * np.mean(pressures_binned, axis = 0).T
+for i, model_name in enumerate(model_paths.keys()):
+    contour_plot_heating = ax[0,i].pcolor(X, Y, zonal_heating_bias[model_name].T, cmap='RdBu')
+    #ax[0,i].contour(X, Y, zonal_heating_rmse[model_name].T, [0.7], colors='orange', linewidths=[4])
+    #ax[0,i].contour(X, Y, zonal_heating_rmse[model_name].T, [0.9], colors='yellow', linewidths=[4])
+    ax[0,i].set_ylim(ax[0,i].get_ylim()[::-1])
+    ax[0,i].set_title(f'{model_labels[model_name]} (heating)', fontsize = 20)
+    ax[0,i].set_xticks([])
+    contour_plot_cooling = ax[1,i].pcolor(X, Y, zonal_moistening_bias[model_name].T, cmap='PuOr') # pcolormesh
+    #ax[1,i].contour(X, Y, zonal_moistening_rmse[model_name].T, [0.7], colors='orange', linewidths=[4])
+    #ax[1,i].contour(X, Y, zonal_moistening_rmse[model_name].T, [0.9], colors='yellow', linewidths=[4])
+    ax[1,i].set_ylim(ax[1,i].get_ylim()[::-1])
+    ax[1,i].set_title(f'{model_labels[model_name]} (moistening)', fontsize = 20)
+    ax[1,i].xaxis.set_ticks([np.sin(-50/180*np.pi), 0, np.sin(50/180*np.pi)])
+    ax[1,i].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'], fontsize = 16)
+    ax[1,i].xaxis.set_tick_params(width = 2)
+    if i != 0:
+        ax[0,i].set_yticks([])
+        ax[1,i].set_yticks([])
+ax[0,0].set_ylabel("Pressure [hPa]", fontsize = 22)
+ax[0,0].yaxis.set_label_coords(-0.2,-0.09) # (-1.38,-0.09)
+ax[0,0].yaxis.set_tick_params(labelsize = 14)
+ax[1,0].yaxis.set_tick_params(labelsize = 14)
+ax[0,0].yaxis.set_ticks([1000,800,600,400,200,0])
+ax[1,0].yaxis.set_ticks([1000,800,600,400,200,0])
+fig.subplots_adjust(right=0.8)
+#acbar_ax = fig.add_axes([0.82, 0.12, 0.02, 0.76])
+#cbh = fig.colorbar(contour_plot_heating, cax=cbar_ax)
+cbh = fig.colorbar(contour_plot_heating)
+cbc = fig.colorbar(contour_plot_cooling)
+cbh.set_label("Skill Score "+r'$\left(\mathrm{Bias}\right)$ (K/s)',labelpad=50.1, fontsize = 20)
+cbc.set_label("Skill Score "+r'$\left(\mathrm{Bias}\right)$ (kg/kg/s)',labelpad=50.1, fontsize = 20)
+plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.97, fontsize = 22)
+plt.subplots_adjust(hspace=0.1)
+plt.savefig(output_save_path + 'unet_press_lat_bias_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
+plt.clf()
+
+
 
 
 
