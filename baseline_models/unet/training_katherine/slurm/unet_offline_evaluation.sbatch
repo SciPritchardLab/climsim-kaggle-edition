@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -A m4334
 #SBATCH -C gpu
-#SBATCH -q debug
-#SBATCH -t 00:15:00
+#SBATCH -q shared
+#SBATCH -t 04:00:00
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4
