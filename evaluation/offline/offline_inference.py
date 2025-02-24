@@ -7,18 +7,22 @@ from tqdm import tqdm
 
 input_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/scoring_input.npy'
 target_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/scoring_target.npy'
-preds_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/'
+preds_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/preds/'
 
+unet_path = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/model.pt'
 pure_resLSTM_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pure_resLSTM_AdamW/model.pt'
 pao_model_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/model.pt'
 
-model_paths = {'pure_resLSTM': pure_resLSTM_path, \
+model_paths = {'unet': unet_path, \
+               'pure_resLSTM': pure_resLSTM_path, \
                'pao_model': pao_model_path}
 
-model_colors = {'pure_resLSTM': 'blue', \
+model_colors = {'unet': 'green', \
+                'pure_resLSTM': 'blue', \
                 'pao_model': 'red'}
 
-model_labels = {'pure_resLSTM': 'pure resLSTM', \
+model_labels = {'unet': 'UNet', \
+                'pure_resLSTM': 'pure resLSTM', \
                 'pao_model': 'Pao Model'}
 
 num_models = len(model_paths)
@@ -35,7 +39,6 @@ output_scale_file = 'output_scale_std_lowerthred_v6.nc'
 lbd_qn_file = 'qn_exp_lambda_large.txt'
 
 grid_path = '../../grid_info/ClimSim_low-res_grid-info.nc'
-norm_path = '../../preprocessing/normalizations/'
 
 grid_info = xr.open_dataset(grid_path)
 input_mean = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_mean_file)
@@ -49,7 +52,8 @@ data = data_utils(grid_info = grid_info,
                   input_max = input_max, 
                   input_min = input_min, 
                   output_scale = output_scale,
-                  qinput_log = False)
+                  qinput_log = False,
+                  normalize = False)
 data.set_to_v2_rh_mc_vars()
 
 input_sub, input_div, out_scale = data.save_norm(write=False) # this extracts only the relevant variables
