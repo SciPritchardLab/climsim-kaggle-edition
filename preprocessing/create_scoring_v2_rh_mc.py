@@ -33,13 +33,13 @@ def main(regexps, save_path, start_idx):
     # else:
     #     regexps = [regexps]
     print(regexps)
-    data.set_regexps(data_split='test', regexps=regexps)
-    data.set_stride_sample(data_split='test', stride_sample=6)
-    data.set_filelist(data_split='test', start_idx=start_idx)
+    data.set_regexps(data_split='scoring', regexps=regexps)
+    data.set_stride_sample(data_split='scoring', stride_sample=6)
+    data.set_filelist(data_split='scoring', start_idx=start_idx)
     #if savepath not exist, create it
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    data.save_as_npy(data_split='test', save_path = save_path)
+    data.save_as_npy(data_split='scoring', save_path = save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process E3SM-MMF data.')
