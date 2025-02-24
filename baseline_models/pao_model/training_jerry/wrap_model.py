@@ -6,20 +6,59 @@ import torch.optim as optim
 import torch.nn as nn
 import modulus
 
-from resLSTM import resLSTM
+from pao_model import pao_model_nn
+import pao_model as pao_model
+
+input_mean_file = 'input_mean_v6_pervar.nc'
+input_max_file = 'input_max_v6_pervar.nc'
+input_min_file = 'input_min_v6_pervar.nc'
+output_scale_file = 'output_scale_std_lowerthred_v6.nc'
+lbd_qn_file = 'qn_exp_lambda_large.txt'
+
+grid_path = '../../../grid_info/ClimSim_low-res_grid-info.nc'
+
+f_torch_model = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/model.mdlus'
+save_file_torch = os.path.join('/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/wrapped/', 'wrapped_model.pt')
+
+grid_info = xr.open_dataset(grid_path)
+input_mean = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_mean_file)
+input_max = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_max_file)
+input_min = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_min_file)
+output_scale = xr.open_dataset('../../../preprocessing/normalizations/outputs/' + output_scale_file)
+lbd_qn = np.loadtxt('../../../preprocessing/normalizations/inputs/' + lbd_qn_file, delimiter = ',')
+
+data = data_utils(grid_info = grid_info, 
+                  input_mean = input_mean, 
+                  input_max = input_max, 
+                  input_min = input_min, 
+                  output_scale = output_scale,
+                  qinput_log=False,
+                  normalize=False)
+
+data.set_to_v2_rh_mc_vars()
+
+input_sub, input_div, out_scale = data.save_norm(write = False)
 
 class WrappedModel(nn.Module):
     def __init__(self, original_model, input_sub, input_div, out_scale, lbd_qn):
         super(WrappedModel, self).__init__()
         self.original_model = original_model
-        self.input_sub = torch.tensor(input_sub, dtype=torch.float32)
-        self.input_div = torch.tensor(input_div, dtype=torch.float32)
-        self.out_scale = torch.tensor(out_scale, dtype=torch.float32)
-        self.lbd_qn = torch.tensor(lbd_qn, dtype=torch.float32)
-        self.input_series_num = 23
-        self.input_single_num = 19
+        self.input_sub = torch.tensor(input_sub, dtype=torch.float32, device = torch.device('cuda'))
+        self.input_div = torch.tensor(input_div, dtype=torch.float32, device = torch.device('cuda'))
+        self.out_scale = torch.tensor(out_scale, dtype=torch.float32, device = torch.device('cuda'))
+        self.lbd_qn = torch.tensor(lbd_qn, dtype=torch.float32, device = torch.device('cuda'))
+        self.input_series_num = 9
+        self.input_single_num = 17
         self.output_series_num = 5
         self.output_single_num = 8
+
+    def to(self, device):
+        """Ensure all tensors are moved to the correct device"""
+        self.input_sub = self.input_sub.to(device)
+        self.input_div = self.input_div.to(device)
+        self.out_scale = self.out_scale.to(device)
+        self.lbd_qn = self.lbd_qn.to(device)
+        return super().to(device)
     
     def apply_temperature_rules(self, T):
         # Create an output tensor, initialized to zero
@@ -36,27 +75,18 @@ class WrappedModel(nn.Module):
         return output
 
     def preprocessing(self, x):
-        
-        # convert v4 input array to v5 input array:
+        # convert v2 input array to v2_rh_mc input array:
         xout = x
-        xout_new = torch.zeros((xout.shape[0], 1405), dtype=xout.dtype)
-        xout_new[:,0:120] = xout[:,0:120]
-        xout_new[:,120:180] = xout[:,120:180] + xout[:,180:240]
-        xout_new[:,180:240] = self.apply_temperature_rules(xout[:,0:60])
-        xout_new[:,240:840] = xout[:,240:840] #60*14
-        xout_new[:,840:900] = xout[:,840:900]+ xout[:,900:960] #dqc+dqi
-        xout_new[:,900:1080] = xout[:,960:1140]
-        xout_new[:,1080:1140] = xout[:,1140:1200]+ xout[:,1200:1260]
-        xout_new[:,1140:1405] = xout[:,1260:1525]
+        xout_new = torch.zeros((xout.shape[0], 557), dtype=xout.dtype, device = x.device)
+        xout_new[:,0:120] = xout[:,0:120] # state_t, state_rh
+        xout_new[:,120:180] = xout[:,120:180] + xout[:,180:240] # state_qn
+        xout_new[:,180:240] = self.apply_temperature_rules(xout[:,0:60]) # liq_partition
+        xout_new[:,240:557] = xout[:,240:557] # state_u, state_v
         x = xout_new
         
         #do input normalization
-        x[:,120:180] = 1 - torch.exp(-x[:,120:180] * self.lbd_qn)
-        mask = torch.ones(x.shape[1], dtype = torch.bool)
-        indices_to_exclude = [-1, -4, -5, -6, -7, -8]
-        mask[indices_to_exclude] = False
-        x = x[:, mask]
-        x= (x - self.input_sub) / self.input_div
+        x[:,120:180] = 1 - torch.exp(-x[:,120:180] * self.lbd_qn.to(x.device))
+        x = (x - self.input_sub.to(x.device)) / self.input_div.to(x.device)
         x = torch.where(torch.isnan(x), torch.tensor(0.0, device=x.device), x)
         x = torch.where(torch.isinf(x), torch.tensor(0.0, device=x.device), x)
         
@@ -65,11 +95,7 @@ class WrappedModel(nn.Module):
         #clip rh input
         x[:, 60:120] = torch.clamp(x[:, 60:120], 0, 1.2)
 
-        x_seq_series = x[:,:self.input_series_num*60].reshape(x.shape[0],self.input_series_num,60).permute(0,2,1) # b, 60, 23
-        x_seq_single = x[:,self.input_series_num*60:].unsqueeze(1).repeat(1,60,1) # b, 60, 19
-        x_seq = torch.cat([x_seq_series, x_seq_single], dim = -1) # b, 60, 42
-
-        return x_seq
+        return x
 
     def postprocessing(self, x):
         x[:,60:75] = 0
@@ -80,6 +106,10 @@ class WrappedModel(nn.Module):
         return x
 
     def forward(self, x):
+        print(f"Model forward pass running on device: {x.device}")
+        # Print the number of available CUDA devices
+        num_gpus = torch.cuda.device_count()
+        print(f"Number of available CUDA devices: {num_gpus}")
         t_before = x[:,0:60].clone()
         qc_before = x[:,120:180].clone()
         qi_before = x[:,180:240].clone()
@@ -94,52 +124,20 @@ class WrappedModel(nn.Module):
         liq_frac = self.apply_temperature_rules(t_new)
         qc_new = liq_frac*qn_new
         qi_new = (1-liq_frac)*qn_new
-        xout = torch.zeros((x.shape[0],368))
+        xout = torch.zeros((x.shape[0],368), device = x.device)
         xout[:,0:120] = x[:,0:120]
         xout[:,240:] = x[:,180:]
         xout[:,120:180] = (qc_new - qc_before)/1200.
         xout[:,180:240] = (qi_new - qi_before)/1200.
-    
         return xout
 
-def save_wrapper(casename):
-    # casename = 'v5_noclassifier_huber_1y_noaggressive'
-    f_torch_model = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_intercomparison/resLSTM_512_v6_r1/model.mdlus'
-    f_inp_sub     = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/inp_sub.txt'
-    f_inp_div     = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/inp_div.txt'
-    f_out_scale   = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/out_scale.txt'
-    f_qn_lbd = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/qn_exp_lambda_large.txt'
-    lbd_qn = np.loadtxt(f_qn_lbd, delimiter=',')
-    input_sub = np.loadtxt(f_inp_sub, delimiter=',')
-    input_div = np.loadtxt(f_inp_div, delimiter=',')
-    out_scale = np.loadtxt(f_out_scale, delimiter=',')
-    model_inf = modulus.Module.from_checkpoint(f_torch_model).to('cpu')
+device = torch.device("cuda")
+model_inf = modulus.Module.from_checkpoint(f_torch_model).to(device)
+wrapped_model = WrappedModel(model_inf, input_sub, input_div, out_scale, lbd_qn).to(device)
+WrappedModel.device = "cuda"
+device = torch.device("cuda")
+scripted_model = torch.jit.script(wrapped_model)
+scripted_model = scripted_model.eval()
+scripted_model.save(save_file_torch)
 
-    wrapped_model = WrappedModel(model_inf, input_sub, input_div, out_scale, lbd_qn)
-
-    WrappedModel.device = "cpu"
-    device = torch.device("cpu")
-    scripted_model = torch.jit.script(wrapped_model)
-    scripted_model = scripted_model.eval()
-    save_file_torch = os.path.join('/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_intercomparison/resLSTM_512_v6/coupling', f'{casename}.pt')
-    scripted_model.save(save_file_torch)
-    return None
-
-save_wrapper('resLSTM_coupling_02')
-
-
-# f_torch_model = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_intercomparison/resLSTM_512_v6/ckpt/ckpt_epoch_47_metric_0.3598.mdlus'
-# f_inp_sub     = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/inp_sub.txt'
-# f_inp_div     = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/inp_div.txt'
-# f_out_scale   = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/out_scale.txt'
-# f_qn_lbd = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/online_testing/baseline_models/resLSTM/training/normalization/qn_exp_lambda_large.txt'
-# lbd_qn = np.loadtxt(f_qn_lbd, delimiter=',')
-# input_sub = np.loadtxt(f_inp_sub, delimiter=',')
-# input_div = np.loadtxt(f_inp_div, delimiter=',')
-# out_scale = np.loadtxt(f_out_scale, delimiter=',')
-# model_inf = modulus.Module.from_checkpoint(f_torch_model).to('cpu')
-
-# wrapped_model = WrappedModel(model_inf, input_sub, input_div, out_scale, lbd_qn)
-
-# WrappedModel.device = "cpu"
-# device = torch.device("cpu")
+print('finished')
