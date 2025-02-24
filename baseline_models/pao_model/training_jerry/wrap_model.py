@@ -139,3 +139,5 @@ device = torch.device("cuda")
 scripted_model = torch.jit.script(wrapped_model)
 scripted_model = scripted_model.eval()
 scripted_model.save(save_file_torch)
+
+print('finished')

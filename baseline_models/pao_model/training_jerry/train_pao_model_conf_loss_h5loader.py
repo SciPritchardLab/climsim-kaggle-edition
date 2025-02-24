@@ -127,7 +127,7 @@ def main(cfg: DictConfig) -> float:
     
     train_dataset = climsim_dataset_processed_h5(cfg.data_path, cfg.output_prune, cfg.strato_lev_out)
             
-    train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
+    train_sampler = DistributedSampler(train_dataset, seed = cfg.seed) if dist.distributed else None
     
     train_loader = DataLoader(train_dataset, 
                                 batch_size=cfg.batch_size, 
@@ -220,11 +220,14 @@ def main(cfg: DictConfig) -> float:
     
     # create loss function
     if cfg.loss == 'mse':
-        criterion = MSELoss_conf()
+        criterion_conf = MSELoss_conf()
+        criterion = nn.MSELoss()
     elif cfg.loss == 'mae':
-        criterion = L1Loss_conf()
+        criterion_conf = L1Loss_conf()
+        criterion = nn.L1Loss()
     elif cfg.loss == 'huber':
-        criterion = SmoothL1Loss_conf()
+        criterion_conf = SmoothL1Loss_conf()
+        criterion = nn.SmoothL1Loss()
     else:
         raise ValueError('Loss function not implemented')
     
@@ -346,7 +349,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
                 optimizer.zero_grad() # Clear gradients first
                 preds, conf = model(data_input) # Forward pass
-                loss = criterion(preds, conf, target) # Calculate loss
+                loss = criterion_conf(preds, conf, target) # Calculate loss
                 loss.backward() # Backward pass
                 optimizer.step() # Update weights
                 # optimizer.zero_grad()
@@ -400,8 +403,8 @@ def main(cfg: DictConfig) -> float:
                 # Move data to the device
                 data_input, target = data_input.to(device), target.to(device)
 
-                output = eval_step_forward(model, data_input)
-                loss = criterion(output, target)
+                preds, conf = eval_step_forward(model, data_input)
+                loss = criterion(preds, target)
                 val_loss += loss.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
