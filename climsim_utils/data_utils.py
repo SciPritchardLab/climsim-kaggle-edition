@@ -5,39 +5,13 @@ import matplotlib.pyplot as plt
 import pickle
 import glob, os
 import re
-import tensorflow as tf
 import netCDF4
 import copy
 import string
 import h5py
+from typing import List
 from tqdm import tqdm
 import zarr
-def eliq(T):
-    """
-    Function taking temperature (in K) and outputting liquid saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
-                              0.206739458e-7,0.302950461e-5,0.264847430e-3,
-                              0.142986287e-1,0.443987641,6.11239921]);
-    c_liq = -80
-    T0 = 273.16
-    return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
-
-def eice(T):
-    """
-    Function taking temperature (in K) and outputting ice saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
-                      0.602588177e-7,0.615021634e-5,0.420895665e-3,
-                      0.188439774e-1,0.503160820,6.11147274]);
-    c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
-    T0 = 273.16
-    return (T>c_ice[0])*eliq(T)+\
-    (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
-    (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
-                       (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
 class data_utils:
     def __init__(self,
@@ -74,6 +48,7 @@ class data_utils:
         # make area-weights
         self.grid_info['area_wgt'] = self.grid_info['area']/self.grid_info['area'].mean(dim = 'ncol')
         self.area_wgt = self.grid_info['area_wgt'].values
+        self.grid_info_area = self.grid_info['area'].values
         # map ncol to nsamples dimension
         # to_xarray = {'area_wgt':(self.sample_name,np.tile(self.grid_info['area_wgt'], int(n_samples/len(self.grid_info['ncol']))))}
         # to_xarray = xr.Dataset(to_xarray)
@@ -82,8 +57,10 @@ class data_utils:
         self.input_min = input_min
         self.output_scale = output_scale
         self.normalize = normalize
-        self.lats, self.lats_indices = np.unique(self.grid_info['lat'].values, return_index=True)
-        self.lons, self.lons_indices = np.unique(self.grid_info['lon'].values, return_index=True)
+        self.lats = self.grid_info['lat'].values
+        self.lons = self.grid_info['lon'].values
+        self.unique_lats, self.lats_indices = np.unique(self.lats, return_index=True)
+        self.unique_lons, self.lons_indices = np.unique(self.lons, return_index=True)
         self.sort_lat_key = np.argsort(self.grid_info['lat'].values[np.sort(self.lats_indices)])
         self.sort_lon_key = np.argsort(self.grid_info['lon'].values[np.sort(self.lons_indices)])
         self.indextolatlon = {i: (self.grid_info['lat'].values[i%self.num_latlon], self.grid_info['lon'].values[i%self.num_latlon]) for i in range(self.num_latlon)}
@@ -96,11 +73,19 @@ class data_utils:
                     keys.append(key)
             return keys
         indices_list = []
-        for lat in self.lats:
+        for lat in self.unique_lats:
             indices = find_keys(self.indextolatlon, lat)
             indices_list.append(indices)
         indices_list.sort(key = lambda x: x[0])
         self.lat_indices_list = indices_list
+
+        if self.num_latlon == 384:
+            self.lat_bins = np.arange(-90, 91, 10)  # Create edges for 10 degree bins
+            self.lat_bin_mids = self.lat_bins[:-1] + 5
+            self.lat_bin_indices = np.digitize(self.lats, self.lat_bins) - 1
+            self.lat_bin_dict = {lat_bin: self.lat_bin_indices == lat_bin for lat_bin in range(len(self.lat_bins) - 1)}
+            self.lat_bin_area_sums = np.array([np.sum(self.grid_info_area[self.lat_bin_dict[lat_bin]]) for lat_bin in self.lat_bin_dict.keys()])
+            self.lat_bin_area_divs = np.array([1/self.lat_bin_area_sums[bin_index] for bin_index in self.lat_bin_indices])
 
         self.hyam = self.grid_info['hyam'].values
         self.hybm = self.grid_info['hybm'].values
@@ -131,7 +116,7 @@ class data_utils:
         self.test_filelist = None
 
         self.full_vars = False
-        self.full_vars_v5 = False
+        self.microphysics_constraint = False
 
         # physical constants from E3SM_ROOT/share/util/shr_const_mod.F90
         self.grav    = 9.80616    # acceleration of gravity ~ m/s^2
@@ -787,7 +772,8 @@ class data_utils:
         self.input_vars = self.v2_rh_mc_inputs
         self.target_vars = self.v2_rh_mc_outputs
         self.ps_index = 360
-        self.full_vars = True
+        self.full_vars = False
+        self.microphysics_constraint = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
@@ -852,7 +838,7 @@ class data_utils:
         self.target_vars = self.v5_outputs
         self.ps_index = 1380
         self.full_vars = False
-        self.full_vars_v5 = True
+        self.microphysics_constraint = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
@@ -869,14 +855,40 @@ class data_utils:
         self.target_vars = self.v6_outputs
         self.ps_index = 1380
         self.full_vars = False
-        self.full_vars_v5 = True
-        self.full_vars_v6 = True
+        self.microphysics_constraint = True
         self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
         self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
         self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
         self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
+
+    def eliq(self, T):
+        """
+        Function taking temperature (in K) and outputting liquid saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
+                                0.206739458e-7,0.302950461e-5,0.264847430e-3,
+                                0.142986287e-1,0.443987641,6.11239921]);
+        c_liq = -80
+        T0 = 273.16
+        return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
+
+    def eice(self, T):
+        """
+        Function taking temperature (in K) and outputting ice saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
+                        0.602588177e-7,0.615021634e-5,0.420895665e-3,
+                        0.188439774e-1,0.503160820,6.11147274]);
+        c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
+        T0 = 273.16
+        return (T>c_ice[0])*eliq(T)+\
+        (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
+        (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
+                        (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
     def get_xrdata(self, file, file_vars = None):
         '''
@@ -967,18 +979,19 @@ class data_utils:
             ds_target['ptend_q0003'] = (ds_target['state_q0003'] - ds_input['state_q0003'])/1200 # Q tendency [kg/kg/s]
             ds_target['ptend_u'] = (ds_target['state_u'] - ds_input['state_u'])/1200 # U tendency [m/s/s]
             ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200 # V tendency [m/s/s]   
-        elif self.full_vars_v5:
+        elif self.microphysics_constraint:
             ds_target['ptend_qn'] = (ds_target['state_q0002'] - ds_input['state_q0002'] + ds_target['state_q0003'] - ds_input['state_q0003'])/1200
             ds_target['ptend_u'] = (ds_target['state_u'] - ds_input['state_u'])/1200 # U tendency [m/s/s]
             ds_target['ptend_v'] = (ds_target['state_v'] - ds_input['state_v'])/1200
         ds_target = ds_target[self.target_vars]
         return ds_target
     
-    def set_regexps(self, data_split, regexps):
+    def set_regexps(self, data_split: str, regexps: List[str]) -> None:
         '''
         This function sets the regular expressions used for getting the filelist for train, val, scoring, and test.
         '''
         assert data_split in ['train', 'val', 'scoring', 'test'], 'Provided data_split is not valid. Available options are train, val, scoring, and test.'
+        assert isinstance(regexps, list), 'Provided regexps is not a list.'
         if data_split == 'train':
             self.train_regexps = regexps
         elif data_split == 'val':
@@ -1131,11 +1144,7 @@ class data_utils:
                 ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name=self.output_abbrev)
                 yield (ds_input.values, ds_target.values)
 
-        return tf.data.Dataset.from_generator(
-            gen,
-            output_types = (tf.float64, tf.float64),
-            output_shapes = ((None,self.input_feature_len),(None,self.target_feature_len))
-        )
+        return gen()
     
     def save_as_npy(self,
                  data_split, 
@@ -1145,9 +1154,8 @@ class data_utils:
         This function saves the training data as a .npy file.
         '''
         data_loader = self.load_ncdata_with_generator(data_split)
-        npy_iterator = list(data_loader.as_numpy_iterator())
-        npy_input = np.concatenate([npy_iterator[x][0] for x in range(len(npy_iterator))])
-        # npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
+        data_list = list(data_loader)
+        npy_input = np.concatenate([data_list[x][0] for x in range(len(data_list))])
 
         if self.normalize:
             npy_input[np.isinf(npy_input)] = 0 # replace inf with 0, some level have constant gas concentration.
@@ -1180,7 +1188,7 @@ class data_utils:
         
         del npy_input
         
-        npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
+        npy_target = np.concatenate([data_list[x][1] for x in range(len(data_list))])
         npy_target = np.float32(npy_target)
 
         if self.save_h5:
@@ -1247,11 +1255,7 @@ class data_utils:
                 #ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name='mlos')
                 yield ds_input.values #ds_target.values)
 
-        return tf.data.Dataset.from_generator(
-            gen,
-            output_types = tf.float64, #tf.float64),
-            output_shapes = (None,self.input_feature_len),   #(None,self.target_feature_len))
-        )
+        return gen()
 
     def save_as_npy_inputonly(self,
                  data_split, 
@@ -1261,8 +1265,8 @@ class data_utils:
         This function saves the training data as a .npy file.
         '''
         data_loader = self.load_ncdata_with_generator_inputonly(data_split)
-        npy_iterator = list(data_loader.as_numpy_iterator())
-        npy_input = np.concatenate([npy_iterator[x] for x in range(len(npy_iterator))])
+        data_list = list(data_loader)
+        npy_input = np.concatenate([data_list[x][0] for x in range(len(data_list))])
         
         # if save_path not exist, create it
         if not os.path.exists(save_path):
@@ -1271,7 +1275,7 @@ class data_utils:
         if save_path[-1] != '/':
             save_path = save_path + '/'
 
-        #npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
+
         with open(save_path + data_split + '_input.npy', 'wb') as f:
             np.save(f, np.float32(npy_input))
         # with open(save_path + data_split + '_target.npy', 'wb') as f:
@@ -1382,7 +1386,26 @@ class data_utils:
         hf = h5py.File(load_path, 'r')
         pred = np.array(hf.get('pred'))
         return pred
-    
+
+    def zonal_bin_weight_2d(self, npy_array):
+        '''
+        This function returns the zonal mean of a 2D numpy array, 
+        assuming that the 0th dimension corresponds to time, 
+        and the 1st dimension corresponds to the latitude bin
+        '''
+        npy_array = npy_array * self.grid_info_area[None, :] * self.lat_bin_area_divs[None, :]
+        return np.stack([np.sum(npy_array[:, self.lat_bin_dict[lat_bin]], axis = 1) for lat_bin in self.lat_bin_dict.keys()], axis = 1)
+
+    def zonal_bin_weight_3d(self, npy_array):
+        '''
+        This function returns the zonal mean of a 3D numpy array, 
+        assuming that the 0th dimension corresponds to time, 
+        the 1st dimension corresponds to the latitude bin,
+        and the 2nd dimension corresponds to vertical level
+        '''
+        npy_array = npy_array * self.grid_info_area[None, :, None] * self.lat_bin_area_divs[None, :, None]
+        return np.stack([np.sum(npy_array[:, self.lat_bin_dict[lat_bin], :], axis = 1) for lat_bin in self.lat_bin_dict.keys()], axis = 1)
+
     def set_pressure_grid(self, data_split):
         '''
         This function sets the pressure weighting for metrics.
@@ -1450,7 +1473,7 @@ class data_utils:
                 if val[0] == value:
                     keys.append(key)
             return keys
-        for lat in self.lats:
+        for lat in self.unique_lats:
             indices = find_keys(self.indextolatlon, lat)
             pg_lats.append(np.mean(pressures[indices, :], axis = 0)[:, np.newaxis])
         pressure_grid_plotting = np.concatenate(pg_lats, axis = 1)
@@ -1469,7 +1492,7 @@ class data_utils:
         if just_weights:
             weightings = np.ones(output.shape)
 
-        if not self.full_vars and not self.full_vars_v5:
+        if not self.full_vars and not self.microphysics_constraint:
             ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             netsw = output[:,120].reshape((int(num_samples/self.num_latlon), self.num_latlon))
@@ -1491,7 +1514,7 @@ class data_utils:
                 soll_weight = weightings[:,365].reshape((int(num_samples/self.num_latlon), self.num_latlon))
                 solsd_weight = weightings[:,366].reshape((int(num_samples/self.num_latlon), self.num_latlon))
                 solld_weight = weightings[:,367].reshape((int(num_samples/self.num_latlon), self.num_latlon))
-        elif self.full_vars_v5:
+        elif self.microphysics_constraint:
             ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
             ptend_qn = output[:,120:180].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
@@ -1591,7 +1614,7 @@ class data_utils:
                     ptend_q0003_weight = ptend_q0003_weight/self.output_scale['ptend_q0003'].values[np.newaxis, np.newaxis, :]
                     ptend_u_weight = ptend_u_weight/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
                     ptend_v_weight = ptend_v_weight/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
-            if self.full_vars_v5:
+            if self.microphysics_constraint:
                 ptend_qn = ptend_qn/self.output_scale['ptend_qn'].values[np.newaxis, np.newaxis, :]
                 ptend_u = ptend_u/self.output_scale['ptend_u'].values[np.newaxis, np.newaxis, :]
                 ptend_v = ptend_v/self.output_scale['ptend_v'].values[np.newaxis, np.newaxis, :]
@@ -1628,7 +1651,7 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * dp/self.grav
                 ptend_u_weight = ptend_u_weight * dp/self.grav  
                 ptend_v_weight = ptend_v_weight * dp/self.grav
-        if self.full_vars_v5:
+        if self.microphysics_constraint:
             ptend_qn = ptend_qn * dp/self.grav
             ptend_u = ptend_u * dp/self.grav
             ptend_v = ptend_v * dp/self.grav
@@ -1670,7 +1693,7 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_u_weight = ptend_u_weight * self.area_wgt[np.newaxis, :, np.newaxis]
                 ptend_v_weight = ptend_v_weight * self.area_wgt[np.newaxis, :, np.newaxis]
-        if self.full_vars_v5:
+        if self.microphysics_constraint:
             ptend_qn = ptend_qn * self.area_wgt[np.newaxis, :, np.newaxis]
             ptend_u = ptend_u * self.area_wgt[np.newaxis, :, np.newaxis]
             ptend_v = ptend_v * self.area_wgt[np.newaxis, :, np.newaxis]
@@ -1712,7 +1735,7 @@ class data_utils:
                 ptend_q0003_weight = ptend_q0003_weight * self.target_energy_conv['ptend_q0003']
                 ptend_u_weight = ptend_u_weight * self.target_energy_conv['ptend_wind']
                 ptend_v_weight = ptend_v_weight * self.target_energy_conv['ptend_wind']
-        if self.full_vars_v5:
+        if self.microphysics_constraint:
             ptend_qn = ptend_qn * self.target_energy_conv['ptend_qn']
             ptend_u = ptend_u * self.target_energy_conv['ptend_wind']
             ptend_v = ptend_v * self.target_energy_conv['ptend_wind']
@@ -1738,7 +1761,7 @@ class data_utils:
                                              soll_weight.reshape((num_samples))[:, np.newaxis], \
                                              solsd_weight.reshape((num_samples))[:, np.newaxis], \
                                              solld_weight.reshape((num_samples))[:, np.newaxis]], axis = 1)
-            elif self.full_vars_v5:
+            elif self.microphysics_constraint:
                 weightings = np.concatenate([ptend_t_weight.reshape((num_samples, 60)), \
                                              ptend_q0001_weight.reshape((num_samples, 60)), \
                                              ptend_qn_weight.reshape((num_samples, 60)), \
@@ -1780,7 +1803,7 @@ class data_utils:
                 var_dict['ptend_q0003'] = ptend_q0003
                 var_dict['ptend_u'] = ptend_u
                 var_dict['ptend_v'] = ptend_v
-            if self.full_vars_v5:
+            if self.microphysics_constraint:
                 var_dict['ptend_qn'] = ptend_qn
                 var_dict['ptend_u'] = ptend_u
                 var_dict['ptend_v'] = ptend_v
@@ -2041,7 +2064,7 @@ class data_utils:
         ptend_q0001_daily = np.mean(ptend_q0001.reshape((ptend_q0001.shape[0]//12, 12, self.num_latlon, 60)), axis = 1) # Nday x lotlonnum x 60
         ptend_t_daily_long = []
         ptend_q0001_daily_long = []
-        for i in range(len(self.lats)):
+        for i in range(len(self.unique_lats)):
             ptend_t_daily_long.append(np.mean(ptend_t_daily[:,self.lat_indices_list[i],:],axis=1))
             ptend_q0001_daily_long.append(np.mean(ptend_q0001_daily[:,self.lat_indices_list[i],:],axis=1))
         ptend_t_daily_long = np.array(ptend_t_daily_long) # lat x Nday x 60
@@ -2056,7 +2079,7 @@ class data_utils:
         n_model = len(self.model_names)
         fig, ax = plt.subplots(2,n_model, figsize=(n_model*12,18))
         y = np.array(range(60))
-        X, Y = np.meshgrid(np.sin(self.lats*np.pi/180), y)
+        X, Y = np.meshgrid(np.sin(self.unique_lats*np.pi/180), y)
         Y = pressure_grid_plotting/100
         test_heat_daily_long, test_moist_daily_long = self.reshape_daily(self.target_scoring)
         for i, model_name in enumerate(self.model_names):
