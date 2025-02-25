@@ -243,7 +243,7 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Scheduler not implemented')
     
     # create loss function
-    
+    '''
     if cfg.loss == 'mse':
         loss_fn = mse
         criterion = MSELoss_conf()
@@ -268,9 +268,10 @@ def main(cfg: DictConfig) -> float:
         criterion = nn.SmoothL1Loss()
     else:
         raise ValueError('Loss function not implemented')
-    '''
+    
 
-    def loss_weighted(pred, conf, target):
+    # I didn't implement weights for the confidence
+    def conf_loss_weighted(pred, conf, target):
         if cfg.variable_subsets in ['v1','v1_dyn']:
             raise ValueError('Weighted loss not implemented for v1/v1_dyn')
         # dt_weight = 1.0
@@ -286,7 +287,7 @@ def main(cfg: DictConfig) -> float:
         # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
         #only do the calculation if any of the weights are not 1.0
         if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
-            return criterion(pred, conf, target)
+            return criterion_conf(pred, conf, target)
         pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
         pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
         pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
@@ -301,7 +302,41 @@ def main(cfg: DictConfig) -> float:
         target[:,240:300] = target[:,240:300] * cfg.du_weight
         target[:,300:360] = target[:,300:360] * cfg.dv_weight
         target[:,360:368] = target[:,360:368] * cfg.d2d_weight
-        return criterion(pred, conf, target)
+        return criterion_conf(pred, conf, target)
+    
+     # I didn't implement weights for the confidence
+    def loss_weighted(pred, target):
+        if cfg.variable_subsets in ['v1','v1_dyn']:
+            raise ValueError('Weighted loss not implemented for v1/v1_dyn')
+        # dt_weight = 1.0
+        # dq1_weight = 1.0
+        # dq2_weight = 1.0
+        # dq3_weight = 1.0
+        # du_weight = 1.0
+        # dv_weight = 1.0
+        # d2d_weight = 1.0
+
+        # pred should be of shape (batch_size, 368)
+        # target should be of shape (batch_size, 368)
+        # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
+        #only do the calculation if any of the weights are not 1.0
+        if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
+            return criterion(pred,  target)
+        pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
+        pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
+        pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
+        pred[:,180:240] = pred[:,180:240] * cfg.dq3_weight
+        pred[:,240:300] = pred[:,240:300] * cfg.du_weight
+        pred[:,300:360] = pred[:,300:360] * cfg.dv_weight
+        pred[:,360:368] = pred[:,360:368] * cfg.d2d_weight
+        target[:,0:60] = target[:,0:60] * cfg.dt_weight
+        target[:,60:120] = target[:,60:120] * cfg.dq1_weight
+        target[:,120:180] = target[:,120:180] * cfg.dq2_weight
+        target[:,180:240] = target[:,180:240] * cfg.dq3_weight
+        target[:,240:300] = target[:,240:300] * cfg.du_weight
+        target[:,300:360] = target[:,300:360] * cfg.dv_weight
+        target[:,360:368] = target[:,360:368] * cfg.d2d_weight
+        return criterion(pred,  target)
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
@@ -368,7 +403,7 @@ def main(cfg: DictConfig) -> float:
     )
     def training_step(model, data_input, target):
         pred_output, conf_output = model(data_input)
-        loss = loss_weighted(pred_output, conf_output, target)
+        loss = conf_loss_weighted(pred_output, conf_output, target)
         return loss
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
@@ -484,10 +519,10 @@ def main(cfg: DictConfig) -> float:
                 if cfg.do_energy_loss:
                     ps_raw = data_input[:,1500]*input_div[1500]+input_sub[1500]
                     loss_energy_train = loss_energy(pred_output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
-                    loss_orig = loss_weighted(pred_output, conf_output, target)
+                    loss_orig = loss_weighted(pred_output, target)
                     loss = loss_orig + loss_energy_train
                 else:
-                    loss = loss_weighted(pred_output, conf_output, target)
+                    loss = loss_weighted(pred_output, target)
                 val_loss += loss.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
