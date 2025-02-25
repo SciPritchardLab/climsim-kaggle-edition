@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -A m4334
 #SBATCH -C gpu
-#SBATCH -q debug
-#SBATCH -t 10:00
+#SBATCH -q regular
+#SBATCH -t 24:00:00
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4
@@ -11,7 +11,7 @@
 #SBATCH --mail-user=jerryL9@uci.edu
 #SBATCH --mail-type=ALL
 
-cmd="python train_pure_resLSTM_h5loader.py --config-name=config_RAdam_debug"
+cmd="python train_pure_resLSTM_h5loader.py --config-name=config_AdamW_restart_1"
 
 cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pure_resLSTM/training_jerry
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
