@@ -405,14 +405,16 @@ def main(cfg: DictConfig) -> float:
 
                 preds, conf = eval_step_forward(model, data_input)
                 loss = criterion(preds, target)
+                loss_conf = criterion(conf, loss)
                 val_loss += loss.item() * data_input.size(0)
+                val_loss_conf += loss_conf.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
                 # Calculate and update the current average loss
                 current_val_loss_avg = val_loss / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
-                del data_input, target, output
+                del data_input, target, preds, conf
                     
             
             # if dist.rank == 0:
@@ -424,6 +426,7 @@ def main(cfg: DictConfig) -> float:
 
             if dist.rank == 0:
                 launchlog.log_epoch({"loss_valid": current_val_loss_avg})
+                launchlog.log_epoch({"loss_valid_conf": current_val_loss_conf})
 
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
