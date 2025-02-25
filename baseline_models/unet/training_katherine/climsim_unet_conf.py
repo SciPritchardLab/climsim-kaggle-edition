@@ -63,7 +63,7 @@ class ClimsimUnetConf(modulus.Module):
             prev_2d: bool = False
             ):
         
-        super().__init__(meta=ClimsimUnetMetaData())
+        super().__init__(meta=ClimsimUnetMetaDataConf())
         # check if hidden_dims is a list of hidden_dims
         self.num_vars_profile = num_vars_profile
         self.num_vars_scalar = num_vars_scalar
