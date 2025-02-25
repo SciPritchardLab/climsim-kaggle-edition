@@ -885,7 +885,7 @@ class data_utils:
                         0.188439774e-1,0.503160820,6.11147274]);
         c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
         T0 = 273.16
-        return (T>c_ice[0])*eliq(T)+\
+        return (T>c_ice[0])*self.eliq(T)+\
         (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
         (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
                         (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
