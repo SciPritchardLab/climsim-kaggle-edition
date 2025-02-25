@@ -24,7 +24,7 @@ Contains the code for the Unet and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class ClimsimUnetMetaData(modulus.ModelMetaData):
+class ClimsimUnetMetaDataConf(modulus.ModelMetaData):
     name: str = "ClimsimUnet"
     # Optimization
     jit: bool = True
@@ -32,7 +32,7 @@ class ClimsimUnetMetaData(modulus.ModelMetaData):
     amp_cpu: bool = False
     amp_gpu: bool = False
 
-class ClimsimUnet(modulus.Module):
+class ClimsimUnetConf(modulus.Module):
     def __init__(
             self, 
             num_vars_profile: int,

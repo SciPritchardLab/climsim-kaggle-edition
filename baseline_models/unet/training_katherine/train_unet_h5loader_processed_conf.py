@@ -21,8 +21,10 @@ from climsim_utils.data_utils import *
 
 from climsim_datapip_processed import climsim_dataset_processed
 from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
-from climsim_unet import ClimsimUnet
-import climsim_unet as climsim_unet
+from climsim_unet_conf import ClimsimUnetConf
+import climsim_unet_conf as climsim_unet_conf
+from custom_losses import MSELoss_conf, L1Loss_conf, SmoothL1Loss_conf
+
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
@@ -171,7 +173,7 @@ def main(cfg: DictConfig) -> float:
     tmp_prev_2d = cfg.prev_2d
     tmp_dropout = cfg.dropout
 
-    model = ClimsimUnet(
+    model = ClimsimUnetConf(
         num_vars_profile = input_size//60,
         num_vars_scalar = input_size%60,
         num_vars_profile_out = output_size//60,
@@ -244,13 +246,13 @@ def main(cfg: DictConfig) -> float:
     
     if cfg.loss == 'mse':
         loss_fn = mse
-        criterion = nn.MSELoss_conf()
+        criterion = MSELoss_conf()
     elif cfg.loss == 'mae':
-        loss_fn = nn.L1Loss_conf()
-        criterion = nn.L1Loss_conf()
+        loss_fn = L1Loss_conf()
+        criterion = L1Loss_conf()
     elif cfg.loss == 'huber':
-        loss_fn = nn.SmoothL1Loss_conf()
-        criterion = nn.SmoothL1Loss_conf()
+        loss_fn = SmoothL1Loss_conf()
+        criterion = SmoothL1Loss_conf()
     else:
         raise ValueError('Loss function not implemented')
     '''
@@ -558,7 +560,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        climsim_unet.device = "cpu"
+        climsim_unet_conf.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)
