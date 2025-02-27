@@ -12,21 +12,22 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'pao_model_debug_ps'
-# exe_refcase = 'ftorch_test'
+# case_prefix = 'dagger2_exp1_iter1_alphap5_test'
+# case_prefix = 'corrected_nndebug_prune_clip_seed'
+case_prefix = 'mmf_speedeval_gpu'
+#exe_refcase = 'v5_noclassifier_huber_1y_noaggressive_minimum_rop2_quick_nvlab'
 # Added extra physics_state and cam_out variables.
 
 top_dir  = os.getenv('HOME')
 scratch_dir = os.getenv('SCRATCH')
-case_dir = scratch_dir+'/hugging/E3SM-MMF_ne4/online_runs/climsim3_allhands'
+case_dir = scratch_dir+'/hugging/E3SM-MMF_ne4/mmf_runs'
 src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 # user_cpp = '-DMMF_ML_TRAINING' # for saving ML variables
 # user_cpp = '-DMMF_NN_EMULATOR -DMMF_NN_EMULATOR_DIAG_PARTIAL -DMMF_NN_EMULATORDEBUG -DTORCH_MMF_NN_EMULATOR_TEST' # NN hybrid test
-user_cpp = '-DMMF_NN_EMULATOR' # NN hybrid test
+user_cpp = '' # NN hybrid test
 # # src_mod_atm_dir = '/global/homes/s/sungduk/repositories/ClimSim-E3SM-Hybrid/'
 ftorch_path = '/global/cfs/cdirs/m4334/shared/FTorch/src/install'
 os.environ["FTorch_ROOT"] = ftorch_path
-
 # RESTART
 runtype = 'branch' # startup, hybrid,  branch
 refdate = '0002-12-30' # only works for branch (and hybrid?)
@@ -47,7 +48,7 @@ dtime = 1200 # set to 0 to use a default value
 stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'00:30:00'
 #stop_opt,stop_n,resub,walltime = 'ndays',10, 0,'00:30:00'
 
-ne,npg=4,2;  num_nodes=2  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
+ne,npg=4,2;  num_nodes=1  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
 # ne,npg=30,2; num_nodes=32 ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
 # ne,npg=30,2; num_nodes=32 ; grid=f'ne{ne}pg{npg}_oECv3' # bi-grid for AMIP or coupled
 
@@ -70,20 +71,20 @@ case='.'.join(case_list)
 f_torch_model = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/wrapped/wrapped_model.pt'
 
 cb_spinup_step = 5
-f_cb_strato_water_constraint = '.true.'
+f_cb_strato_water_constraint = '.false.'
 
 f_cb_do_ramp = '.false.'
 f_cb_ramp_option = 'step'
 cb_ramp_factor = 1.0
 cb_ramp_step_0steps = 80
 cb_ramp_step_1steps = 10
-cb_use_cuda = '.true.'
 
 
 #---------------------------------------------------------------------------------------------------
 print('\n  case : '+case+'\n')
 
-if 'CPU' in arch : max_mpi_per_node,atm_nthrds  = 64,1 ; max_task_per_node = 64
+# if 'CPU' in arch : max_mpi_per_node,atm_nthrds  = 64,1 ; max_task_per_node = 64
+if 'CPU' in arch : max_mpi_per_node,atm_nthrds  = 4,8 ; max_task_per_node = 32
 if 'GPU' in arch : max_mpi_per_node,atm_nthrds  =  4,8 ; max_task_per_node = 32
 if arch=='CORI'  : max_mpi_per_node,atm_nthrds  = 64,1
 atm_ntasks = max_mpi_per_node*num_nodes
@@ -155,13 +156,12 @@ cb_ramp_factor = {cb_ramp_factor}
 cb_ramp_step_0steps = {cb_ramp_step_0steps}
 cb_ramp_step_1steps = {cb_ramp_step_1steps}
 cb_strato_water_constraint = {f_cb_strato_water_constraint}
-cb_use_cuda = {cb_use_cuda}
 /
 
 &cam_history_nl
-fincl1 = 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS', 'CLDICE', 'CLDLIQ'
-fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+fincl1 = 'CLDICE', 'CLDLIQ'
+fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ'
+fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ'
 avgflag_pertape = 'A','A','I'
 nhtfrq = 0,-24,-1
 mfilt  = 0,1,1

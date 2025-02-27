@@ -5,39 +5,13 @@ import matplotlib.pyplot as plt
 import pickle
 import glob, os
 import re
-import tensorflow as tf
 import netCDF4
 import copy
 import string
 import h5py
+from typing import List
 from tqdm import tqdm
 import zarr
-def eliq(T):
-    """
-    Function taking temperature (in K) and outputting liquid saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
-                              0.206739458e-7,0.302950461e-5,0.264847430e-3,
-                              0.142986287e-1,0.443987641,6.11239921]);
-    c_liq = -80
-    T0 = 273.16
-    return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
-
-def eice(T):
-    """
-    Function taking temperature (in K) and outputting ice saturation
-    pressure (in hPa) using a polynomial fit
-    """
-    a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
-                      0.602588177e-7,0.615021634e-5,0.420895665e-3,
-                      0.188439774e-1,0.503160820,6.11147274]);
-    c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
-    T0 = 273.16
-    return (T>c_ice[0])*eliq(T)+\
-    (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
-    (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
-                       (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
 
 class data_utils:
     def __init__(self,
@@ -889,6 +863,33 @@ class data_utils:
         self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
         self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
 
+    def eliq(self, T):
+        """
+        Function taking temperature (in K) and outputting liquid saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
+                                0.206739458e-7,0.302950461e-5,0.264847430e-3,
+                                0.142986287e-1,0.443987641,6.11239921]);
+        c_liq = -80
+        T0 = 273.16
+        return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
+
+    def eice(self, T):
+        """
+        Function taking temperature (in K) and outputting ice saturation
+        pressure (in hPa) using a polynomial fit
+        """
+        a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
+                        0.602588177e-7,0.615021634e-5,0.420895665e-3,
+                        0.188439774e-1,0.503160820,6.11147274]);
+        c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
+        T0 = 273.16
+        return (T>c_ice[0])*self.eliq(T)+\
+        (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
+        (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
+                        (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
+
     def get_xrdata(self, file, file_vars = None):
         '''
         This function reads in a file and returns an xarray dataset with the variables specified.
@@ -903,7 +904,7 @@ class data_utils:
                 T00 = 253.16 # Temperature below which we use e_ice
                 omega = (tair - T00) / (T0 - T00)
                 omega = np.maximum( 0, np.minimum( 1, omega ))
-                esat =  omega * eliq(tair) + (1-omega) * eice(tair)
+                esat =  omega * self.eliq(tair) + (1-omega) * self.eice(tair)
                 Rd = 287 # Specific gas constant for dry air
                 Rv = 461 # Specific gas constant for water vapor    
                 qvs = (Rd*esat)/(Rv*ds['state_pmid'])
@@ -985,11 +986,12 @@ class data_utils:
         ds_target = ds_target[self.target_vars]
         return ds_target
     
-    def set_regexps(self, data_split, regexps):
+    def set_regexps(self, data_split: str, regexps: List[str]) -> None:
         '''
         This function sets the regular expressions used for getting the filelist for train, val, scoring, and test.
         '''
         assert data_split in ['train', 'val', 'scoring', 'test'], 'Provided data_split is not valid. Available options are train, val, scoring, and test.'
+        assert isinstance(regexps, list), 'Provided regexps is not a list.'
         if data_split == 'train':
             self.train_regexps = regexps
         elif data_split == 'val':
@@ -1142,11 +1144,7 @@ class data_utils:
                 ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name=self.output_abbrev)
                 yield (ds_input.values, ds_target.values)
 
-        return tf.data.Dataset.from_generator(
-            gen,
-            output_types = (tf.float64, tf.float64),
-            output_shapes = ((None,self.input_feature_len),(None,self.target_feature_len))
-        )
+        return gen()
     
     def save_as_npy(self,
                  data_split, 
@@ -1156,9 +1154,8 @@ class data_utils:
         This function saves the training data as a .npy file.
         '''
         data_loader = self.load_ncdata_with_generator(data_split)
-        npy_iterator = list(data_loader.as_numpy_iterator())
-        npy_input = np.concatenate([npy_iterator[x][0] for x in range(len(npy_iterator))])
-        # npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
+        data_list = list(data_loader)
+        npy_input = np.concatenate([data_list[x][0] for x in range(len(data_list))])
 
         if self.normalize:
             npy_input[np.isinf(npy_input)] = 0 # replace inf with 0, some level have constant gas concentration.
@@ -1191,7 +1188,7 @@ class data_utils:
         
         del npy_input
         
-        npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
+        npy_target = np.concatenate([data_list[x][1] for x in range(len(data_list))])
         npy_target = np.float32(npy_target)
 
         if self.save_h5:
@@ -1258,11 +1255,7 @@ class data_utils:
                 #ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name='mlos')
                 yield ds_input.values #ds_target.values)
 
-        return tf.data.Dataset.from_generator(
-            gen,
-            output_types = tf.float64, #tf.float64),
-            output_shapes = (None,self.input_feature_len),   #(None,self.target_feature_len))
-        )
+        return gen()
 
     def save_as_npy_inputonly(self,
                  data_split, 
@@ -1272,8 +1265,8 @@ class data_utils:
         This function saves the training data as a .npy file.
         '''
         data_loader = self.load_ncdata_with_generator_inputonly(data_split)
-        npy_iterator = list(data_loader.as_numpy_iterator())
-        npy_input = np.concatenate([npy_iterator[x] for x in range(len(npy_iterator))])
+        data_list = list(data_loader)
+        npy_input = np.concatenate([data_list[x][0] for x in range(len(data_list))])
         
         # if save_path not exist, create it
         if not os.path.exists(save_path):
@@ -1282,7 +1275,7 @@ class data_utils:
         if save_path[-1] != '/':
             save_path = save_path + '/'
 
-        #npy_target = np.concatenate([npy_iterator[x][1] for x in range(len(npy_iterator))])
+
         with open(save_path + data_split + '_input.npy', 'wb') as f:
             np.save(f, np.float32(npy_input))
         # with open(save_path + data_split + '_target.npy', 'wb') as f:
@@ -1412,7 +1405,7 @@ class data_utils:
         '''
         npy_array = npy_array * self.grid_info_area[None, :, None] * self.lat_bin_area_divs[None, :, None]
         return np.stack([np.sum(npy_array[:, self.lat_bin_dict[lat_bin], :], axis = 1) for lat_bin in self.lat_bin_dict.keys()], axis = 1)
-    
+
     def set_pressure_grid(self, data_split):
         '''
         This function sets the pressure weighting for metrics.

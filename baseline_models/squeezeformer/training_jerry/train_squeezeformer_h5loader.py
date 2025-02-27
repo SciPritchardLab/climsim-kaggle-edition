@@ -22,16 +22,14 @@ from climsim_utils.data_utils import *
 from climsim_datapip_processed import climsim_dataset_processed
 from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
 
-from pao_model_conf_loss import pao_model_conf_loss_nn
-import pao_model_conf_loss as pao_model_conf_loss
-from custom_losses import MSELoss_conf, L1Loss_conf, SmoothL1Loss_conf
+from squeezeformer import squeezeformer_nn
+import squeezeformer as squeezeformer
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
 import random
-from soap import SOAP
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -127,7 +125,7 @@ def main(cfg: DictConfig) -> float:
     
     train_dataset = climsim_dataset_processed_h5(cfg.data_path, cfg.output_prune, cfg.strato_lev_out)
             
-    train_sampler = DistributedSampler(train_dataset, seed = cfg.seed) if dist.distributed else None
+    train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
     
     train_loader = DataLoader(train_dataset, 
                                 batch_size=cfg.batch_size, 
@@ -138,7 +136,7 @@ def main(cfg: DictConfig) -> float:
                                 num_workers=cfg.num_workers)
     # Create dataloaders
     # train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True)
-    #val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False)
+    # val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False)
 
     # train_loader = DataLoader(train_dataset, 
     #                           batch_size=cfg.batch_size, 
@@ -154,13 +152,11 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    model = pao_model_conf_loss_nn(
+    model = squeezeformer_nn(
             input_series_num = data.input_series_num,
             input_scalar_num = data.input_scalar_num,
             target_series_num = data.target_series_num,
             target_scalar_num = data.target_scalar_num,
-            hidden_series_num = cfg.hidden_series_num,
-            hidden_scalar_num = cfg.hidden_scalar_num,
             output_prune = cfg.output_prune,
             strato_lev_out = cfg.strato_lev_out,
             ).to(dist.device)
@@ -220,13 +216,13 @@ def main(cfg: DictConfig) -> float:
     
     # create loss function
     if cfg.loss == 'mse':
-        criterion_conf = MSELoss_conf()
+        loss_fn = mse
         criterion = nn.MSELoss()
     elif cfg.loss == 'mae':
-        criterion_conf = L1Loss_conf()
+        loss_fn = nn.L1Loss()
         criterion = nn.L1Loss()
     elif cfg.loss == 'huber':
-        criterion_conf = SmoothL1Loss_conf()
+        loss_fn = nn.SmoothL1Loss()
         criterion = nn.SmoothL1Loss()
     else:
         raise ValueError('Loss function not implemented')
@@ -348,8 +344,8 @@ def main(cfg: DictConfig) -> float:
                 #     target[:,180:180+cfg.strato_lev] = 0
                 data_input, target = data_input.to(device), target.to(device)
                 optimizer.zero_grad() # Clear gradients first
-                preds, conf = model(data_input) # Forward pass
-                loss = criterion_conf(preds, conf, target) # Calculate loss
+                output = model(data_input) # Forward pass
+                loss = criterion(output, target) # Calculate loss
                 loss.backward() # Backward pass
                 optimizer.step() # Update weights
                 # optimizer.zero_grad()
@@ -403,18 +399,16 @@ def main(cfg: DictConfig) -> float:
                 # Move data to the device
                 data_input, target = data_input.to(device), target.to(device)
 
-                preds, conf = eval_step_forward(model, data_input)
-                loss = criterion(preds, target)
-                loss_conf = criterion(conf, loss)
+                output = eval_step_forward(model, data_input)
+                loss = criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
-                val_loss_conf += loss_conf.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
                 # Calculate and update the current average loss
                 current_val_loss_avg = val_loss / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
-                del data_input, target, preds, conf
+                del data_input, target, output
                     
             
             # if dist.rank == 0:
@@ -426,7 +420,6 @@ def main(cfg: DictConfig) -> float:
 
             if dist.rank == 0:
                 launchlog.log_epoch({"loss_valid": current_val_loss_avg})
-                launchlog.log_epoch({"loss_valid_conf": current_val_loss_conf})
 
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
@@ -472,7 +465,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        pao_model_conf_loss.device = "cpu"
+        pao_model.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)
