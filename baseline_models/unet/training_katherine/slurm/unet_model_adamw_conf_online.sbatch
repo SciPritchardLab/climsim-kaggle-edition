@@ -12,7 +12,7 @@
 #SBATCH --output=out_%j.out
 #SBATCH --error=eo_%j.err
 
-cmd="python online_run.py --config-name=config_adamw_conf"
+cmd="python online_run.py"
 
 cd /global/cfs/cdirs/m4334/kfrields/climsim3/baseline_models/unet/training_katherine
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
