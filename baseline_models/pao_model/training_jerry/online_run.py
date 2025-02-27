@@ -12,7 +12,7 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'pao_model_debug'
+case_prefix = 'pao_model_debug_ps'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
@@ -118,7 +118,7 @@ if newcase :
    # setup branch/hybrid
    if runtype == 'branch':
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_TYPE   --val {runtype}') # 'branch' won't allow change model time steps
-      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /pscratch/sd/z/zeyuanhu/shared_e3sm/restart_files/{refdate}-{reftod}')
+      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/z/zeyuanhu/shared_e3sm/restart_files/{refdate}-{reftod}')
       run_cmd(f'./xmlchange --file env_run.xml --id GET_REFCASE --val TRUE')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFCASE --val E3SM_ML_ne4_rerun.F2010-MMF1')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDATE --val {refdate}')
@@ -160,10 +160,11 @@ cb_use_cuda = {cb_use_cuda}
 
 &cam_history_nl
 fincl1 = 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS', 'CLDICE', 'CLDLIQ'
-fincl2 = 'PRECT', 'PRECC' 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-avgflag_pertape = 'A','A'
-nhtfrq = 0,-24
-mfilt  = 0,1
+fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+avgflag_pertape = 'A','A','I'
+nhtfrq = 0,-24,-1
+mfilt  = 0,1,1
 /
 
                      ''')
@@ -189,9 +190,9 @@ if config :
    run_cmd('./case.setup --reset')
 #---------------------------------------------------------------------------------------------------
 if build : 
-  if debug_mode: run_cmd('./xmlchange --file env_build.xml --id DEBUG --val TRUE ')
-  if clean : run_cmd('./case.build --clean')
-  run_cmd('./case.build')
+   if debug_mode: run_cmd('./xmlchange --file env_build.xml --id DEBUG --val TRUE ')
+   if clean : run_cmd('./case.build --clean')
+   run_cmd('./case.build')
 
 # run_cmd(f'cp /pscratch/sd/z/zeyuanhu/e3sm_mlt_scratch/{exe_refcase}/build/e3sm.exe ./build/')
 # run_cmd('./xmlchange BUILD_COMPLETE=TRUE')
