@@ -119,7 +119,7 @@ class WrappedModel(nn.Module):
         qn_before = qc_before + qi_before
         
         x = self.preprocessing(x)
-        x = self.original_model(x)
+        x, conf = self.original_model(x)
         x = self.postprocessing(x)
         
         t_new = t_before + x[:,0:60]*1200.
