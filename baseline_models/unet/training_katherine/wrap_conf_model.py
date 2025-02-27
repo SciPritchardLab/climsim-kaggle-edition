@@ -17,8 +17,8 @@ lbd_qn_file = 'qn_exp_lambda_large.txt'
 
 grid_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
 
-f_torch_model = '/global/homes/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/model.mdlus'
-save_file_torch = os.path.join('/global/homes/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/', 'wrapped_model.pt')
+f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/model.mdlus'
+save_file_torch = os.path.join('/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/', 'wrapped_model.pt')
 
 norm_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/'
 input_mean_file = 'inputs/input_mean_v6_pervar.nc'
@@ -31,7 +31,7 @@ grid_info = xr.open_dataset(grid_path)
 input_mean = xr.open_dataset(norm_path + input_mean_file)
 input_max = xr.open_dataset(norm_path + input_max_file)
 input_min = xr.open_dataset(norm_path + input_min_file)
-output_scale = xr.open_dataset(norm_path + + output_scale_file)
+output_scale = xr.open_dataset(norm_path + output_scale_file)
 lbd_qn = np.loadtxt(norm_path + lbd_qn_file, delimiter = ',')
 
 data = data_utils(grid_info = grid_info, 
@@ -109,10 +109,10 @@ class WrappedModel(nn.Module):
         return x
 
     def forward(self, x):
-        print(f"Model forward pass running on device: {x.device}")
+        #print(f"Model forward pass running on device: {x.device}")
         # Print the number of available CUDA devices
         num_gpus = torch.cuda.device_count()
-        print(f"Number of available CUDA devices: {num_gpus}")
+        #print(f"Number of available CUDA devices: {num_gpus}")
         t_before = x[:,0:60].clone()
         qc_before = x[:,120:180].clone()
         qi_before = x[:,180:240].clone()
