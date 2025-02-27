@@ -47,10 +47,6 @@ class WrappedModel(nn.Module):
         self.input_div = torch.tensor(input_div, dtype=torch.float32, device = torch.device('cuda'))
         self.out_scale = torch.tensor(out_scale, dtype=torch.float32, device = torch.device('cuda'))
         self.lbd_qn = torch.tensor(lbd_qn, dtype=torch.float32, device = torch.device('cuda'))
-        self.input_series_num = 9
-        self.input_single_num = 17
-        self.output_series_num = 5
-        self.output_single_num = 8
 
     def to(self, device):
         """Ensure all tensors are moved to the correct device"""
