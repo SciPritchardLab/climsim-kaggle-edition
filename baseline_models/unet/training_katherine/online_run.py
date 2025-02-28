@@ -20,7 +20,7 @@ top_dir  = os.getenv('HOME')
 scratch_dir = os.getenv('SCRATCH')
 
 #case_dir = scratch_dir+'/hugging/E3SM-MMF_ne4/online_runs/climsim3_allhands'
-case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online/'
+case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online'
 #src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 src_dir = '/global/homes/j/jerrylin/nvidia_codes/E3SM_nvlab/'
 
