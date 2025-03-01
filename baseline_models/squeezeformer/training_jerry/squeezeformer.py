@@ -9,7 +9,7 @@ from torch.nn.functional import silu
 from typing import List
 
 """
-Contains the code for the Pao model and its training.
+Contains the code for the squeezeformer
 """
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -53,7 +53,7 @@ class squeezeformer_nn(modulus.Module):
         ###
         # forward pass code here
         ###
-        
+
         y = torch.cat([series_part, scalar_output], dim = 1)
         # Prune output
         if self.output_prune:

@@ -29,31 +29,31 @@ class pao_model_metadata(modulus.ModelMetaData):
 
 class pao_model_nn(modulus.Module):
     def __init__(self,
-                 input_series_num: int = 9, # number of input series
+                 input_profile_num: int = 9, # number of input profile
                  input_scalar_num: int = 17, # number of input scalars
-                 target_series_num: int = 5, # number of target series
+                 target_profile_num: int = 5, # number of target profile
                  target_scalar_num: int = 8, # number of target scalars
-                 hidden_series_num: int = 160, # number of hidden units in MLP for series
+                 hidden_profile_num: int = 160, # number of hidden units in MLP for profile
                  hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
                 ):
         super().__init__(meta = pao_model_metadata())
-        self.input_series_num = input_series_num
+        self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
-        self.target_series_num = target_series_num
+        self.target_profile_num = target_profile_num
         self.target_scalar_num = target_scalar_num
-        self.hidden_series_num = hidden_series_num
+        self.hidden_profile_num = hidden_profile_num
         self.hidden_scalar_num = hidden_scalar_num
-        self.num_hidden_total = self.hidden_series_num + self.hidden_scalar_num
+        self.num_hidden_total = self.hidden_profile_num + self.hidden_scalar_num
         self.output_prune = output_prune
         self.strato_lev_out = strato_lev_out
-        # 60 series 1d cnn
+        # 60 profile 1d cnn
         self.feature_scale_list = nn.ModuleList([
-            FeatureScale(60) for _ in range(self.input_series_num)
+            FeatureScale(60) for _ in range(self.input_profile_num)
         ])
-        self.positional_encoding = nn.Embedding(60, self.hidden_series_num)
-        self.input_linear = nn.Linear(self.input_series_num, self.hidden_series_num)  # current, diff
+        self.positional_encoding = nn.Embedding(60, self.hidden_profile_num)
+        self.input_linear = nn.Linear(self.input_profile_num, self.hidden_profile_num)  # current, diff
         self.other_feats_mlp = nn.Sequential(
             nn.Linear(self.input_scalar_num, self.hidden_scalar_num),
             nn.BatchNorm1d(self.hidden_scalar_num),
@@ -67,7 +67,7 @@ class pao_model_nn(modulus.Module):
         self.other_feats_proj_list = nn.ModuleList([nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num) for _ in range(60)])
         # layer norm
         self.layer_norm_in = self.num_hidden_total
-        self.series_layer_norm = nn.LayerNorm(self.layer_norm_in)
+        self.profile_layer_norm = nn.LayerNorm(self.layer_norm_in)
         # cnn
         self.cnn1 = nn.Sequential(
             ResidualBlock(self.num_hidden_total, self.num_hidden_total, 5, 1, 2),
@@ -80,15 +80,15 @@ class pao_model_nn(modulus.Module):
             nn.LSTM(self.num_hidden_total, self.num_hidden_total, 2, batch_first=True, bidirectional=True, dropout=0.0),
         )
         # output layer
-        self.output_series_mlp_input_dim = self.num_hidden_total * 2
-        self.series_output_mlp = nn.Sequential(
-            nn.Linear(self.output_series_mlp_input_dim, self.num_hidden_total),
+        self.output_profile_mlp_input_dim = self.num_hidden_total * 2
+        self.profile_output_mlp = nn.Sequential(
+            nn.Linear(self.output_profile_mlp_input_dim, self.num_hidden_total),
             nn.GELU(),
             nn.Linear(self.num_hidden_total, self.num_hidden_total),
             nn.GELU(),
-            nn.Linear(self.num_hidden_total, self.hidden_series_num),
+            nn.Linear(self.num_hidden_total, self.hidden_profile_num),
             nn.GELU(),
-            nn.Linear(self.hidden_series_num, self.target_series_num)
+            nn.Linear(self.hidden_profile_num, self.target_profile_num)
         )
         self.output_scalar_mlp_input_dim = self.num_hidden_total * 60 * 2
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
@@ -105,13 +105,13 @@ class pao_model_nn(modulus.Module):
     def forward(self, x):
         # reshape input
         batch_size = x.size(0)
-        series_part = x[:, :self.input_series_num*60]
-        series_inputs = series_part.reshape(batch_size, self.input_series_num, 60)
-        scalar_inputs = x[:, self.input_series_num*60:]
+        profile_part = x[:, :self.input_profile_num*60]
+        profile_inputs = profile_part.reshape(batch_size, self.input_profile_num, 60)
+        scalar_inputs = x[:, self.input_profile_num*60:]
         dim60_x = []
         # scale_ix = 0
         for group_ix, feature_scale in enumerate(self.feature_scale_list):
-            origin_x = series_inputs[:, group_ix, :] # (batch, 60)
+            origin_x = profile_inputs[:, group_ix, :] # (batch, 60)
             x = feature_scale(origin_x)  # (batch, 60)
             # scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
@@ -132,10 +132,10 @@ class pao_model_nn(modulus.Module):
             # x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
             # dim60_x.append(x_diff_diff)
 
-        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.input_series_num)
+        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.input_profile_num)
         position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
         position = self.positional_encoding(position)  # (batch, 60, 128)
-        x = self.input_linear(x)  # (batch, series_len, 128)
+        x = self.input_linear(x)  # (batch, profile_len, 128)
         x = x + position
         # other cols
         scalar_x = scalar_inputs  # (batch, 19)
@@ -144,26 +144,26 @@ class pao_model_nn(modulus.Module):
         for lev_idx, other_feats_proj in enumerate(self.other_feats_proj_list):
             scalar_x_list.append(other_feats_proj(scalar_x))
         scalar_x = torch.stack(scalar_x_list, dim=1)  # (batch, 60, hidden)
-        # repeat to match series_len
-        # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, series_len, hidden)
+        # repeat to match profile_len
+        # scaler_x = scaler_x.unsqueeze(1).repeat(1, x.size(1), 1)  # (batch, profile_len, hidden)
         # concat
         x = torch.cat([x, scalar_x], dim=2)  # (batch, 60, hidden*2)
-        x = self.series_layer_norm(x)
+        x = self.profile_layer_norm(x)
 
-        x = x.transpose(1, 2)  # (batch, hidden, series_len)
-        x = self.cnn1(x)  # (batch, hidden, series_len)
+        x = x.transpose(1, 2)  # (batch, hidden, profile_len)
+        x = self.cnn1(x)  # (batch, hidden, profile_len)
         x = x.transpose(1, 2)
-        x, _ = self.lstm(x)  # (batch, series_len, hidden)
+        x, _ = self.lstm(x)  # (batch, profile_len, hidden)
 
-        series_output = self.series_output_mlp(x)  # (batch, series_len, n_targets)
-        # series_diff_output = series_output[:, :, self.target_series_num:]
-        # series_output = series_output[:, :, :self.target_series_num]
+        profile_output = self.profile_output_mlp(x)  # (batch, profile_len, n_targets)
+        # profile_diff_output = profile_output[:, :, self.target_profile_num:]
+        # profile_output = profile_output[:, :, :self.target_profile_num]
         x = x.reshape(x.size(0), -1)
         x = self.scalar_layer_norm(x)
         scalar_output = self.scalar_output_mlp(x)
         # Reshape output
-        series_part = series_output.reshape(batch_size, self.target_series_num * 60)
-        y = torch.cat([series_part, scalar_output], dim = 1)
+        profile_part = profile_output.reshape(batch_size, self.target_profile_num * 60)
+        y = torch.cat([profile_part, scalar_output], dim = 1)
         # Prune output
         if self.output_prune:
             # Zeyuan says that the .clone() and .clone().zero_() helped bypass a torchscript issue. Reason unclear.

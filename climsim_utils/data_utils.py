@@ -709,12 +709,12 @@ class data_utils:
         self.target_vars = self.v1_outputs
         self.ps_index = 120
         self.full_vars = False
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 124
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 124
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 128
 
     def set_to_v1_dyn_vars(self):
         '''
@@ -725,12 +725,12 @@ class data_utils:
         self.target_vars = self.v1_outputs
         self.ps_index = 240
         self.full_vars = False
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 224
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 128
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 224
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 128
 
     def set_to_v2_vars(self):
         '''
@@ -741,12 +741,12 @@ class data_utils:
         self.target_vars = self.v2_outputs
         self.ps_index = 360
         self.full_vars = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_vars(self):
         '''
@@ -757,12 +757,12 @@ class data_utils:
         self.target_vars = self.v2_outputs
         self.ps_index = 360
         self.full_vars = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
 
     def set_to_v2_rh_mc_vars(self):
         '''
@@ -774,12 +774,12 @@ class data_utils:
         self.ps_index = 360
         self.full_vars = False
         self.microphysics_constraint = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 557
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 557
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 308
 
     def set_to_v2_dyn_vars(self):
         '''
@@ -790,12 +790,12 @@ class data_utils:
         self.target_vars = self.v2_outputs
         self.ps_index = 600
         self.full_vars = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 797
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 797
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
 
     def set_to_v3_vars(self):
         '''
@@ -806,12 +806,12 @@ class data_utils:
         self.target_vars = self.v3_outputs
         self.ps_index = 720
         self.full_vars = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 737
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 737
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
 
     def set_to_v4_vars(self):
         '''
@@ -822,12 +822,12 @@ class data_utils:
         self.target_vars = self.v4_outputs
         self.ps_index = 1500
         self.full_vars = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1525
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 1525
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
     
     def set_to_v5_vars(self):
         '''
@@ -839,12 +839,12 @@ class data_utils:
         self.ps_index = 1380
         self.full_vars = False
         self.microphysics_constraint = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1405 = 737 + 788 - 120
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 368
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 1405 = 737 + 788 - 120
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
 
     def set_to_v6_vars(self):
         '''
@@ -856,12 +856,12 @@ class data_utils:
         self.ps_index = 1380
         self.full_vars = False
         self.microphysics_constraint = True
-        self.input_series_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
-        self.target_series_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
-        self.input_feature_len = self.input_series_num * 60 + self.input_scalar_num # 1399
-        self.target_feature_len = self.target_series_num * 60 + self.target_scalar_num # 308
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 1399
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 308
 
     def eliq(self, T):
         """
@@ -1457,28 +1457,6 @@ class data_utils:
             self.dp_test = self.pressure_grid_test[1:61,:,:] - self.pressure_grid_test[0:60,:,:]
             self.dp_test = self.dp_test.transpose((1,2,0))
 
-    def get_pressure_grid_plotting(self, data_split):
-        '''
-        This function creates the temporally and zonally averaged pressure grid corresponding to a given data split.
-        '''
-        filelist = self.get_filelist(data_split)
-        ps = np.concatenate([self.get_xrdata(file, ['state_ps'])['state_ps'].values[np.newaxis, :] for file in tqdm(filelist)], axis = 0)[:, :, np.newaxis]
-        hyam_component = self.hyam[np.newaxis, np.newaxis, :]*self.p0
-        hybm_component = self.hybm[np.newaxis, np.newaxis, :]*ps
-        pressures = np.mean(hyam_component + hybm_component, axis = 0)
-        pg_lats = []
-        def find_keys(dictionary, value):
-            keys = []
-            for key, val in dictionary.items():
-                if val[0] == value:
-                    keys.append(key)
-            return keys
-        for lat in self.unique_lats:
-            indices = find_keys(self.indextolatlon, lat)
-            pg_lats.append(np.mean(pressures[indices, :], axis = 0)[:, np.newaxis])
-        pressure_grid_plotting = np.concatenate(pg_lats, axis = 1)
-        return pressure_grid_plotting
-
     def output_weighting(self, output, data_split, just_weights = False):
         '''
         This function does four transformations, and assumes we are using V1 variables:
@@ -2048,166 +2026,3 @@ class data_utils:
                         current_idx += self.var_lens[target_var]
                 self.metrics_var_test[model_name] = df_var
                 self.metrics_idx_test[model_name] = df_idx
-
-    def reshape_daily(self, output):
-        '''
-        This function returns two numpy arrays, one for each vertically resolved variable (ptend_t and ptend_q0001).
-        Dimensions of expected input are num_samples by 128 (number of target features).
-        Output argument is espected to be have dimensions of num_samples by features.
-        ptend_t is expected to be the first feature, and ptend_q0001 is expected to be the second feature.
-        Data is expected to use a stride_sample of 6. (12 samples per day, 20 min timestep).
-        '''
-        num_samples = output.shape[0]
-        ptend_t = output[:,:60].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-        ptend_q0001 = output[:,60:120].reshape((int(num_samples/self.num_latlon), self.num_latlon, 60))
-        ptend_t_daily = np.mean(ptend_t.reshape((ptend_t.shape[0]//12, 12, self.num_latlon, 60)), axis = 1) # Nday x lotlonnum x 60
-        ptend_q0001_daily = np.mean(ptend_q0001.reshape((ptend_q0001.shape[0]//12, 12, self.num_latlon, 60)), axis = 1) # Nday x lotlonnum x 60
-        ptend_t_daily_long = []
-        ptend_q0001_daily_long = []
-        for i in range(len(self.unique_lats)):
-            ptend_t_daily_long.append(np.mean(ptend_t_daily[:,self.lat_indices_list[i],:],axis=1))
-            ptend_q0001_daily_long.append(np.mean(ptend_q0001_daily[:,self.lat_indices_list[i],:],axis=1))
-        ptend_t_daily_long = np.array(ptend_t_daily_long) # lat x Nday x 60
-        ptend_q0001_daily_long = np.array(ptend_q0001_daily_long) # lat x Nday x 60
-        return ptend_t_daily_long, ptend_q0001_daily_long
-
-    def plot_r2_analysis(self, pressure_grid_plotting, save_path = ''):
-        '''
-        This function plots the R2 pressure latitude figure shown in the SI.
-        '''
-        self.set_plot_params()
-        n_model = len(self.model_names)
-        fig, ax = plt.subplots(2,n_model, figsize=(n_model*12,18))
-        y = np.array(range(60))
-        X, Y = np.meshgrid(np.sin(self.unique_lats*np.pi/180), y)
-        Y = pressure_grid_plotting/100
-        test_heat_daily_long, test_moist_daily_long = self.reshape_daily(self.target_scoring)
-        for i, model_name in enumerate(self.model_names):
-            pred_heat_daily_long, pred_moist_daily_long = self.reshape_daily(self.preds_scoring[model_name])
-            coeff = 1 - np.sum( (pred_heat_daily_long-test_heat_daily_long)**2, axis=1)/np.sum( (test_heat_daily_long-np.mean(test_heat_daily_long, axis=1)[:,None,:])**2, axis=1)
-            coeff = coeff[self.sort_lat_key,:]
-            coeff = coeff.T
-            
-            contour_plot = ax[0,i].pcolor(X, Y, coeff,cmap='Blues', vmin = 0, vmax = 1) # pcolormesh
-            ax[0,i].contour(X, Y, coeff, [0.7], colors='orange', linewidths=[4])
-            ax[0,i].contour(X, Y, coeff, [0.9], colors='yellow', linewidths=[4])
-            ax[0,i].set_ylim(ax[0,i].get_ylim()[::-1])
-            ax[0,i].set_title(self.model_names[i] + " - ptend_t")
-            ax[0,i].set_xticks([])
-            
-            coeff = 1 - np.sum( (pred_moist_daily_long-test_moist_daily_long)**2, axis=1)/np.sum( (test_moist_daily_long-np.mean(test_moist_daily_long, axis=1)[:,None,:])**2, axis=1)
-            coeff = coeff[self.sort_lat_key,:]
-            coeff = coeff.T
-            
-            contour_plot = ax[1,i].pcolor(X, Y, coeff,cmap='Blues', vmin = 0, vmax = 1) # pcolormesh
-            ax[1,i].contour(X, Y, coeff, [0.7], colors='orange', linewidths=[4])
-            ax[1,i].contour(X, Y, coeff, [0.9], colors='yellow', linewidths=[4])
-            ax[1,i].set_ylim(ax[1,i].get_ylim()[::-1])
-            ax[1,i].set_title(self.model_names[i] + " - ptend_q0001")
-            ax[1,i].xaxis.set_ticks([np.sin(-50/180*np.pi), 0, np.sin(50/180*np.pi)])
-            ax[1,i].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'])
-            ax[1,i].xaxis.set_tick_params(width = 2)
-            
-            if i != 0:
-                ax[0,i].set_yticks([])
-                ax[1,i].set_yticks([])
-                
-        # lines below for x and y label axes are valid if 3 models are considered
-        # we want to put only one label for each axis
-        # if nbr of models is different from 3 please adjust label location to center it
-
-        #ax[1,1].xaxis.set_label_coords(-0.10,-0.10)
-
-        ax[0,0].set_ylabel("Pressure [hPa]")
-        ax[0,0].yaxis.set_label_coords(-0.2,-0.09) # (-1.38,-0.09)
-        ax[0,0].yaxis.set_ticks([1000,800,600,400,200,0])
-        ax[1,0].yaxis.set_ticks([1000,800,600,400,200,0])
-        
-        fig.subplots_adjust(right=0.8)
-        cbar_ax = fig.add_axes([0.82, 0.12, 0.02, 0.76])
-        cb = fig.colorbar(contour_plot, cax=cbar_ax)
-        cb.set_label("Skill Score "+r'$\left(\mathrm{R^{2}}\right)$',labelpad=50.1)
-        plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.97)
-        plt.subplots_adjust(hspace=0.13)
-        plt.show()
-        plt.savefig(save_path + 'press_lat_diff_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
-    
-    @staticmethod
-    def reshape_input_for_cnn(npy_input, save_path = ''):
-        '''
-        This function reshapes a numpy input array to be compatible with CNN training.
-        Each variable becomes its own channel.
-        For the input there are 6 channels, each with 60 vertical levels.
-        The last 4 channels correspond to scalars repeated across all 60 levels.
-        This is for V1 data only! (V2 data has more variables)
-        '''
-        npy_input_cnn = np.stack([
-            npy_input[:, 0:60],
-            npy_input[:, 60:120],
-            np.repeat(npy_input[:, 120][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_input[:, 121][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_input[:, 122][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_input[:, 123][:, np.newaxis], 60, axis = 1)], axis = 2)
-        
-        if save_path != '':
-            with open(save_path + 'train_input_cnn.npy', 'wb') as f:
-                np.save(f, np.float32(npy_input_cnn))
-        return npy_input_cnn
-    
-    @staticmethod
-    def reshape_target_for_cnn(npy_target, save_path = ''):
-        '''
-        This function reshapes a numpy target array to be compatible with CNN training.
-        Each variable becomes its own channel.
-        For the input there are 6 channels, each with 60 vertical levels.
-        The last 4 channels correspond to scalars repeated across all 60 levels.
-        This is for V1 data only! (V2 data has more variables)
-        '''
-        npy_target_cnn = np.stack([
-            npy_target[:, 0:60],
-            npy_target[:, 60:120],
-            np.repeat(npy_target[:, 120][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 121][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 122][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 123][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 124][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 125][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 126][:, np.newaxis], 60, axis = 1),
-            np.repeat(npy_target[:, 127][:, np.newaxis], 60, axis = 1)], axis = 2)
-        
-        if save_path != '':
-            with open(save_path + 'train_target_cnn.npy', 'wb') as f:
-                np.save(f, np.float32(npy_target_cnn))
-        return npy_target_cnn
-    
-    @staticmethod
-    def reshape_target_from_cnn(npy_predict_cnn, save_path = ''):
-        '''
-        This function reshapes CNN target to (num_samples, 128) for standardized metrics.
-        This is for V1 data only! (V2 data has more variables)
-        '''
-        npy_predict_cnn_reshaped = np.concatenate([
-            npy_predict_cnn[:,:,0],
-            npy_predict_cnn[:,:,1],
-            np.mean(npy_predict_cnn[:,:,2], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,3], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,4], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,5], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,6], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,7], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,8], axis = 1)[:, np.newaxis],
-            np.mean(npy_predict_cnn[:,:,9], axis = 1)[:, np.newaxis]], axis = 1)
-        
-        if save_path != '':
-            with open(save_path + 'cnn_predict_reshaped.npy', 'wb') as f:
-                np.save(f, np.float32(npy_predict_cnn_reshaped))
-        return npy_predict_cnn_reshaped
-
-
-
-
-  
-
-
-
-
