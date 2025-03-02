@@ -121,7 +121,7 @@ if newcase :
    # setup branch/hybrid
    if runtype == 'branch':
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_TYPE   --val {runtype}') # 'branch' won't allow change model time steps
-      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/z/zeyuanhu/shared_e3sm/restart_files/{refdate}-{reftod}')
+      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/k/kfrields/shared_e3sm/restart_files/{refdate}-{reftod}')
       run_cmd(f'./xmlchange --file env_run.xml --id GET_REFCASE --val TRUE')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFCASE --val E3SM_ML_ne4_rerun.F2010-MMF1')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDATE --val {refdate}')
