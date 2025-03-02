@@ -55,7 +55,7 @@ qinput_log: False
 restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'unet_jerry_debug'
+expname: 'unet_default_debug'
 
 #climsim_path: '/global/u2/z/zeyuanhu/nvidia_codes/Climsim_private/'
 climsim_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/'
@@ -76,13 +76,7 @@ train_input: 'train_input.npy'
 train_target: 'train_target.npy'
 val_input: 'val_input.npy'
 val_target: 'val_target.npy'
-variable_subsets: 'v2_rh_mc'
-qinput_log: False
-restart_path: ''
-classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus'
-#save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-save_path: '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/'
-expname: 'v2rh_mc_fix_huber'
+
 
 qinput_prune: True
 qoutput_prune: True
