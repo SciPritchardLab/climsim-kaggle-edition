@@ -22,7 +22,7 @@ scratch_dir = os.getenv('SCRATCH')
 #case_dir = scratch_dir+'/hugging/E3SM-MMF_ne4/online_runs/climsim3_allhands'
 case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online'
 #src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
-src_dir = '/global/homes/j/jerrylin/nvidia_codes/E3SM_nvlab'
+src_dir = '/global/homes/k/kfrields/nvidia_codes/E3SM_nvlab'
 
 # user_cpp = '-DMMF_ML_TRAINING' # for saving ML variables
 # user_cpp = '-DMMF_NN_EMULATOR -DMMF_NN_EMULATOR_DIAG_PARTIAL -DMMF_NN_EMULATORDEBUG -DTORCH_MMF_NN_EMULATOR_TEST' # NN hybrid test
