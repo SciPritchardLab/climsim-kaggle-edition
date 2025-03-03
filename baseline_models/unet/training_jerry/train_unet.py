@@ -54,7 +54,7 @@ def main(cfg: DictConfig) -> float:
                   qinput_log=cfg.qinput_log)
 
     # set variables to subset
-    if cfg.variable_subsets == 'v1': 
+    if cfg.variable_subsets == 'v1':
         data.set_to_v1_vars()
     elif cfg.variable_subsets == 'v1_dyn':
         data.set_to_v1_dyn_vars()
@@ -64,6 +64,8 @@ def main(cfg: DictConfig) -> float:
         data.set_to_v2_dyn_vars()
     elif cfg.variable_subsets == 'v2_rh':
         data.set_to_v2_rh_vars()
+    elif cfg.variable_subsets == 'v2_rh_mc':
+        data.set_to_v2_rh_mc_vars()
     elif cfg.variable_subsets == 'v3':
         data.set_to_v3_vars()
     elif cfg.variable_subsets == 'v4':
@@ -88,10 +90,12 @@ def main(cfg: DictConfig) -> float:
 
     # print(train_input_path)
 
-    val_input_path = cfg.data_path + cfg.val_input
-    val_target_path = cfg.data_path + cfg.val_target
-    if not os.path.exists(cfg.data_path + cfg.val_input):
+    val_input_path = cfg.val_input
+    val_target_path = cfg.val_target
+    if not os.path.exists(cfg.val_input):
         raise ValueError('Validation input path does not exist')
+    if not os.path.exists(cfg.val_target):
+        raise ValueError('Validation target path does not exist')
 
     #choose dataset class based on cfg.lazy_load
     # if cfg.lazy_load:
