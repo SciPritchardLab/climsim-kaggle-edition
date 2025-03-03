@@ -26,9 +26,9 @@ class pure_resLSTM_metadata(modulus.ModelMetaData):
 class pure_resLSTM_nn(modulus.Module):
     def __init__(
             self,
-            input_series_num: int = 9, # number of input series
+            input_profile_num: int = 9, # number of input profile
             input_scalar_num: int = 17, # number of input scalars
-            target_series_num: int = 5, # number of target series
+            target_profile_num: int = 5, # number of target profile
             target_scalar_num: int = 8, # number of target scalars
             num_lstm: int = 10, # number of LSTM layers
             hidden_state: int = 256, # number of hidden units in LSTM
@@ -36,12 +36,12 @@ class pure_resLSTM_nn(modulus.Module):
             strato_lev_out: int = 12, # number of levels to set to zero
             ):
         super().__init__(meta=pure_resLSTM_metadata())
-        self.input_series_num = input_series_num
+        self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
-        self.target_series_num = target_series_num
+        self.target_profile_num = target_profile_num
         self.target_scalar_num = target_scalar_num
-        self.inputs_dim = input_series_num + input_scalar_num
-        self.targets_dim = target_series_num + target_scalar_num
+        self.inputs_dim = input_profile_num + input_scalar_num
+        self.targets_dim = target_profile_num + target_scalar_num
         self.num_lstm = num_lstm
         self.hidden_state = hidden_state
         self.output_prune = output_prune
@@ -85,9 +85,9 @@ class pure_resLSTM_nn(modulus.Module):
                     p.data.fill_(0)
                        
     def forward(self, x):
-        series_part = x[:,:self.input_series_num*60].reshape(-1,self.input_series_num,60).transpose(1,2)
-        scalar_part = x[:,self.input_series_num*60:].unsqueeze(1).repeat(1,60,1)
-        inputs_seq = torch.cat([series_part, scalar_part], dim = -1)
+        profile_part = x[:,:self.input_profile_num*60].reshape(-1,self.input_profile_num,60).transpose(1,2)
+        scalar_part = x[:,self.input_profile_num*60:].unsqueeze(1).repeat(1,60,1)
+        inputs_seq = torch.cat([profile_part, scalar_part], dim = -1)
         outputs = inputs_seq  # b,60,self.inputs_dim
         last_outputs = outputs
         # pass through LSTM layer by layer and apply residual connection
@@ -102,12 +102,12 @@ class pure_resLSTM_nn(modulus.Module):
 
         outputs = self.fc(outputs)  # b,60,self.targets_dim
 
-        series_part = outputs[:,:,self.target_scalar_num:]
-        series_part = series_part.permute(0,2,1).reshape(-1,300) # b,300
-        single_part = outputs[:,:,:self.target_scalar_num]
-        single_part = torch.mean(single_part, dim=1) # b,8
+        profile_part = outputs[:,:,self.target_scalar_num:]
+        profile_part = profile_part.permute(0,2,1).reshape(-1,300) # b,300
+        scalar_part = outputs[:,:,:self.target_scalar_num]
+        scalar_part = torch.mean(scalar_part, dim=1) # b,8
 
-        y = torch.concat([series_part, single_part], dim=1)
+        y = torch.concat([profile_part, scalar_part], dim=1)
 
         if self.output_prune:
             # Zeyuan says that the .clone() and .clone().zero_() helped bypass a torchscript issue. Reason unclear.

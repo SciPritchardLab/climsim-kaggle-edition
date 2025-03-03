@@ -1,17 +1,23 @@
 #!/bin/bash
 #SBATCH -A m4334
-#SBATCH -C cpu
+#SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 50:00
+#SBATCH -t 40:00
 #SBATCH -n 1
 #SBATCH -c 32
+##SBATCH --gpus-per-task=1
 #SBATCH --image=nvcr.io/nvidia/modulus/modulus:24.01
-#SBATCH --output=create_scoring_%j.out
 #SBATCH --mail-user=jerryL9@uci.edu
 #SBATCH --mail-type=ALL
+##SBATCH --output=out_%j.out
+##SBATCH --error=eo_%j.err
 
-shifter python create_scoring_v2_rh_mc.py \
+shifter python ../process_data_split_v2_rh_mc.py \
             'E3SM-MMF.ml2steploc.0008-0[23456789]-*-*.nc' \
             'E3SM-MMF.ml2steploc.0008-1[012]-*-*.nc' \
             'E3SM-MMF.ml2steploc.0009-01-*-*.nc' \
-    --save_path '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/'
+    --data_split 'val' \
+    --stride_sample 7 \
+    --start_idx 1 \
+    --save_h5 True \
+    --save_path '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/'

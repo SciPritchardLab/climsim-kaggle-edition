@@ -7,7 +7,7 @@ from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
 from modulus.metrics.general.mse import mse
-
+from loss_energy import loss_energy
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
@@ -21,16 +21,14 @@ from climsim_utils.data_utils import *
 
 from climsim_datapip_processed import climsim_dataset_processed
 from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
-
-from pure_resLSTM import pure_resLSTM_nn
-import pure_resLSTM as pure_resLSTM
+from climsim_unet import ClimsimUnet
+import climsim_unet as climsim_unet
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import gc
 import random
-from soap import SOAP
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -46,11 +44,18 @@ def main(cfg: DictConfig) -> float:
     DistributedManager.initialize()
     dist = DistributedManager()
 
-    grid_info = xr.open_dataset(cfg.grid_info)
-    input_mean = xr.open_dataset(cfg.input_mean)
-    input_max = xr.open_dataset(cfg.input_max)
-    input_min = xr.open_dataset(cfg.input_min)
-    output_scale = xr.open_dataset(cfg.output_scale)
+    grid_path = cfg.climsim_path+'/grid_info/ClimSim_low-res_grid-info.nc'
+    norm_path = cfg.climsim_path+'/preprocessing/normalizations/'
+    grid_info = xr.open_dataset(grid_path)
+    input_mean = xr.open_dataset(norm_path + cfg.input_mean)
+    input_max = xr.open_dataset(norm_path + cfg.input_max)
+    input_min = xr.open_dataset(norm_path + cfg.input_min)
+    output_scale = xr.open_dataset(norm_path + cfg.output_scale)
+    # qc_lbd = xr.open_dataset(norm_path + cfg.qc_lbd)
+    # qi_lbd = xr.open_dataset(norm_path + cfg.qi_lbd)
+
+    lbd_qc = np.loadtxt(norm_path + cfg.qc_lbd, delimiter=',')
+    lbd_qi = np.loadtxt(norm_path + cfg.qi_lbd, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 
                   input_mean = input_mean, 
@@ -100,9 +105,7 @@ def main(cfg: DictConfig) -> float:
     val_input_path = cfg.val_input
     val_target_path = cfg.val_target
     if not os.path.exists(cfg.val_input):
-        raise ValueError(f'Validation input path does not exist: {cfg.val_input}')
-    if not os.path.exists(cfg.val_target):
-        raise ValueError(f'Validation target path does not exist: {cfg.val_target}')
+        raise ValueError('Validation input path does not exist')
 
     #choose dataset class based on cfg.lazy_load
     # if cfg.lazy_load:
@@ -126,6 +129,7 @@ def main(cfg: DictConfig) -> float:
     
     train_dataset = climsim_dataset_processed_h5(cfg.data_path, cfg.output_prune, cfg.strato_lev_out)
             
+    #this sampler will be used by our data loader to allow us to work with paraellel gpu tasks
     train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
     
     train_loader = DataLoader(train_dataset, 
@@ -153,16 +157,33 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    model = pure_resLSTM_nn(
-            input_profile_num = data.input_profile_num,
-            input_scalar_num = data.input_scalar_num,
-            target_profile_num = data.target_profile_num,
-            target_scalar_num = data.target_scalar_num,
-            num_lstm = cfg.num_lstm,
-            hidden_state = cfg.hidden_state,
-            output_prune = cfg.output_prune,
-            strato_lev_out = cfg.strato_lev_out,
-            ).to(dist.device)
+    tmp_unet_model_channels = int(cfg.unet_model_channels)
+    tmp_unet_attn_resolutions = [i for i in cfg.unet_attn_resolutions]
+    tmp_unet_num_blocks = int(cfg.unet_num_blocks)
+    tmp_output_prune = cfg.output_prune
+    tmp_strato_lev = cfg.strato_lev_out
+    tmp_loc_embedding = cfg.loc_embedding
+    tmp_skip_conv = cfg.skip_conv
+    tmp_prev_2d = cfg.prev_2d
+    tmp_dropout = cfg.dropout
+
+    model = ClimsimUnet(
+        num_vars_profile = input_size//60,
+        num_vars_scalar = input_size%60,
+        num_vars_profile_out = output_size//60,
+        num_vars_scalar_out = output_size%60,
+        seq_resolution = 64,
+        model_channels = tmp_unet_model_channels,
+        channel_mult = [1, 2, 2, 2],
+        num_blocks = tmp_unet_num_blocks,
+        attn_resolutions = tmp_unet_attn_resolutions,
+        dropout = tmp_dropout,
+        output_prune=tmp_output_prune,
+        strato_lev=tmp_strato_lev,
+        loc_embedding=tmp_loc_embedding,
+        skip_conv=tmp_skip_conv,
+        prev_2d=tmp_prev_2d
+    ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
         print("Restarting from checkpoint: " + cfg.restart_path)
@@ -196,14 +217,8 @@ def main(cfg: DictConfig) -> float:
         torch.cuda.current_stream().wait_stream(ddps)
 
     # create optimizer
-    if cfg.optimizer == 'Adam':
+    if cfg.optimizer == 'adam':
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'AdamW':
-        optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'RAdam':
-        optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'SOAP':
-        optimizer = SOAP(model.parameters(), lr = cfg.learning_rate, betas=(.95, .95), weight_decay=.01, precondition_frequency=10)
     else:
         raise ValueError('Optimizer not implemented')
     
@@ -229,6 +244,39 @@ def main(cfg: DictConfig) -> float:
         criterion = nn.SmoothL1Loss()
     else:
         raise ValueError('Loss function not implemented')
+    
+    def loss_weighted(pred, target):
+        if cfg.variable_subsets in ['v1','v1_dyn']:
+            raise ValueError('Weighted loss not implemented for v1/v1_dyn')
+        # dt_weight = 1.0
+        # dq1_weight = 1.0
+        # dq2_weight = 1.0
+        # dq3_weight = 1.0
+        # du_weight = 1.0
+        # dv_weight = 1.0
+        # d2d_weight = 1.0
+
+        # pred should be of shape (batch_size, 368)
+        # target should be of shape (batch_size, 368)
+        # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
+        #only do the calculation if any of the weights are not 1.0
+        if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
+            return criterion(pred, target)
+        pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
+        pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
+        pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
+        pred[:,180:240] = pred[:,180:240] * cfg.dq3_weight
+        pred[:,240:300] = pred[:,240:300] * cfg.du_weight
+        pred[:,300:360] = pred[:,300:360] * cfg.dv_weight
+        pred[:,360:368] = pred[:,360:368] * cfg.d2d_weight
+        target[:,0:60] = target[:,0:60] * cfg.dt_weight
+        target[:,60:120] = target[:,60:120] * cfg.dq1_weight
+        target[:,120:180] = target[:,120:180] * cfg.dq2_weight
+        target[:,180:240] = target[:,180:240] * cfg.dq3_weight
+        target[:,240:300] = target[:,240:300] * cfg.du_weight
+        target[:,300:360] = target[:,300:360] * cfg.dv_weight
+        target[:,360:368] = target[:,360:368] * cfg.d2d_weight
+        return criterion(pred, target)
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
@@ -288,15 +336,15 @@ def main(cfg: DictConfig) -> float:
     input_div_device = torch.tensor(input_div, dtype=torch.float32).to(device)
     out_scale_device = torch.tensor(out_scale, dtype=torch.float32).to(device)
 
-    # @StaticCaptureTraining(
-    #     model=model,
-    #     optim=optimizer,
-    #     # cuda_graph_warmup=11,
-    # )
-    # def training_step(model, data_input, target):
-    #     output = model(data_input)
-    #     loss = criterion(output, target)
-    #     return loss
+    @StaticCaptureTraining(
+        model=model,
+        optim=optimizer,
+        # cuda_graph_warmup=11,
+    )
+    def training_step(model, data_input, target):
+        output = model(data_input)
+        loss = loss_weighted(output, target)
+        return loss
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
         return my_model(invar)
@@ -333,7 +381,7 @@ def main(cfg: DictConfig) -> float:
         #                           num_workers=cfg.num_workers)
         # wrap the epoch in launch logger to control frequency of output for console logs
         with LaunchLogger("train", epoch=epoch, mini_batch_log_freq=10) as launchlog:
-            model.train()
+            # model.train()
             # Wrap train_loader with tqdm for a progress bar
             train_loop = tqdm(train_loader, desc=f'Epoch {epoch+1}')
             current_step = 0
@@ -346,21 +394,17 @@ def main(cfg: DictConfig) -> float:
                 #     target[:,120:120+cfg.strato_lev] = 0
                 #     target[:,180:180+cfg.strato_lev] = 0
                 data_input, target = data_input.to(device), target.to(device)
-                optimizer.zero_grad() # Clear gradients first
-                output = model(data_input) # Forward pass
-                loss = criterion(output, target) # Calculate loss
-                loss.backward() # Backward pass
-                optimizer.step() # Update weights
                 # optimizer.zero_grad()
                 # output = model(data_input)
                 # if cfg.do_energy_loss:
                 #     ps_raw = data_input[:,1500]*input_div[1500]+input_sub[1500]
                 #     loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
-                #     loss_orig = criterion(output, target)
+                #     loss_orig = loss_weighted(output, target)
                 #     loss = loss_orig + loss_energy_train
                 # else:
-                #     loss = criterion(output, target)
+                #     loss = loss_weighted(output, target)
                 # loss.backward()
+                loss = training_step(model, data_input, target)
                 # max_grad = max(p.grad.abs().max() for p in model.parameters() if p.grad is not None)
                 # # Initialize a list to store the L2 norms of each parameter's gradient
                 # l2_norms = []
@@ -379,15 +423,21 @@ def main(cfg: DictConfig) -> float:
                 # scheduler.step()
                 #launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy()})
                 #if dist.rank == 0:
-                launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
+                if cfg.do_energy_loss:
+                    launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "loss_energy_train": loss_energy_train.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"], "loss_orig": loss_orig.detach().cpu().numpy()})
+                else:
+                    launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
                 # Update the progress bar description with the current loss
                 train_loop.set_description(f'Epoch {epoch+1}')
                 train_loop.set_postfix(loss=loss.item())
                 current_step += 1
             #launchlog.log_epoch({"Learning Rate": optimizer.param_groups[0]["lr"]})
             
-            model.eval()
+            # model.eval()
             val_loss = 0.0
+            if cfg.do_energy_loss:
+                val_energy_loss = 0.0
+                val_orig = 0.0
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')
             current_step = 0
@@ -403,7 +453,13 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 output = eval_step_forward(model, data_input)
-                loss = criterion(output, target)
+                if cfg.do_energy_loss:
+                    ps_raw = data_input[:,1500]*input_div[1500]+input_sub[1500]
+                    loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
+                    loss_orig = loss_weighted(output, target)
+                    loss = loss_orig + loss_energy_train
+                else:
+                    loss = loss_weighted(output, target)
                 val_loss += loss.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
@@ -411,6 +467,11 @@ def main(cfg: DictConfig) -> float:
                 current_val_loss_avg = val_loss / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
+                if cfg.do_energy_loss:
+                    val_energy_loss += loss_energy_train.item() * data_input.size(0)
+                    val_orig += loss_orig.item() * data_input.size(0)
+                    current_val_loss_avg_energy = val_energy_loss / num_samples_processed
+                    current_val_loss_avg_orig = val_orig / num_samples_processed
                 del data_input, target, output
                     
             
@@ -422,7 +483,10 @@ def main(cfg: DictConfig) -> float:
                 current_val_loss_avg = current_val_loss_avg.item() / dist.world_size
 
             if dist.rank == 0:
-                launchlog.log_epoch({"loss_valid": current_val_loss_avg})
+                if cfg.do_energy_loss:
+                    launchlog.log_epoch({"loss_valid": current_val_loss_avg, "loss_energy_valid": current_val_loss_avg_energy, "loss_orig_valid": current_val_loss_avg_orig})
+                else:
+                    launchlog.log_epoch({"loss_valid": current_val_loss_avg})
 
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
@@ -468,7 +532,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        pure_resLSTM.device = "cpu"
+        climsim_unet.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)
