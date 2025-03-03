@@ -40,31 +40,26 @@
 #    #  n_jobs: 2
 
 seed: 43
+num_workers: 32
 
-data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
+data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/train_set/'
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
-input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v6_pervar.nc'
-input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v6_pervar.nc'
-input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v6_pervar.nc'
-output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v6.nc'
+input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v2_rh_mc_pervar.nc'
+input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v2_rh_mc_pervar.nc'
+input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v2_rh_mc_pervar.nc'
+output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v2_rh_mc.nc'
 
 qc_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qc_exp_lambda_large.txt'
 qi_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qi_exp_lambda_large.txt'
 
-train_input: 'train_input.npy'
-train_target: 'train_target.npy'
-val_input: 'val_input.npy'
-val_target: 'val_target.npy'
+val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_input.npy'
+val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_target.npy'
 variable_subsets: 'v2_rh_mc'
-qinput_log: False
-restart_path: ''
-save_path: '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/'
-expname: 'unet_seed_43'
-
-qinput_prune: True
+qinput_prune: True # dataset setting
+qinput_log: False 
 qoutput_prune: True
-output_prune: True
-aggressive_pruning: False
+output_prune: True # dataset setting
+aggressive_pruning: False # dataset setting
 strato_lev: 15
 strato_lev_out: 12
 strato_lev_qc: 30
@@ -72,38 +67,19 @@ strato_lev_qinput: 22
 strato_lev_tinput: -1
 input_clip: True
 input_clip_rhonly: True
+top_ckpt_mode: 'min'
+decouple_cloud: False
+
+# training settings
+restart_path: ''
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/unet/'
+expname: 'unet_seed_43'
 batch_size: 1024
 epochs: 16
 learning_rate: 0.0001
-optimizer: 'adam'
-weight_decay: 0.00005
-loss: 'huber'
-
-q_mask_threshold: 0.0
-mse_weight: 1.0
-bce_weight: 1.0
-energy_loss_weight: 1.0
-
-unet_num_blocks: 2
-unet_attn_resolutions: [0]
-unet_model_channels: 128
-squeeze_dim: 384
-squeeze_head_dim: 2048
-mlp_hidden_dims: [256, 256, 256, 256, 256, 256, 256, 256, 256]
-mlp_layers: 9
-loc_embedding: False
-skip_conv: False
-prev_2d: False
-lazy_load: False
 save_top_ckpts: 15
-top_ckpt_mode: 'min'
-dropout: 0.0
-decouple_cloud: False
-clip_grad: False
-drop_extreme_samples: False
-drop_extreme_threshold: 500.0
-
-# setup the scheduler with 1. step 2. cosine 3. reducedonplateau
+optimizer: 'AdamW'
+loss: 'Huber'
 scheduler_name: 'step'
 scheduler:
    step:
@@ -119,25 +95,22 @@ scheduler:
       T_0: 5
       T_mult: 1
       eta_min: 1.5e-6
-
 scheduler_warmup: 
    enable: False
    warmup_steps: 20
    warmup_strategy: 'cos'
    init_lr: 1e-7
-
-load_nonjoint_model:
-   enable: False
-   restart_path: ''
-
 early_stop_step: -1
-
 logger: 'wandb'
 wandb:
    project: "climsim3_ensembles"
    entity: "cbrain"
 
-mlflow:
-   project: "MLP_test"
-
-num_workers: 32
+# model hyperparameters
+num_blocks: 2
+attn_resolutions: [0]
+model_channels: 128
+dropout: 0.0
+loc_embedding: False
+skip_conv: False
+prev_2d: False
