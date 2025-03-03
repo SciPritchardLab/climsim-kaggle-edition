@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # defaults:
 #   - override hydra/sweeper: optuna
 #   - override hydra/sweeper/sampler: tpe
@@ -53,19 +52,23 @@ output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normaliz
 variable_subsets: 'v2_rh_mc'
 
 # dataset preprocessing settings
-qinput_prune: True # dataset setting
-output_prune: True # dataset setting
-strato_lev: 15 # dataset setting
+qinput_prune: True # (bool): Whether to prune the input data
+output_prune: True # (bool): Whether to prune the output data
+strato_lev: 15 # (int): Number of levels in the stratosphere
 qc_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qc_exp_lambda_large.txt'
+# (np.ndarray) coefficients for the exponential transformation of qc
 qi_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qi_exp_lambda_large.txt'
+# (np.ndarray) coefficients for the exponential transformation of qi
 decouple_cloud: False
-aggressive_pruning: False # dataset setting
+aggressive_pruning: False
 strato_lev_qc: 30
 strato_lev_qinput: 22
 strato_lev_tinput: -1
 strato_lev_out: 12
 input_clip: True
 input_clip_rhonly: True
+# the difference between strato_lev and strato_lev_out is that strato_lev is used as a reference for pruning the input
+# and strato_lev_out is a constant value for pruning the output vector
 
 # training settings
 seed: 43

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # defaults:
 #   - override hydra/sweeper: optuna
 #   - override hydra/sweeper/sampler: tpe
@@ -39,97 +38,51 @@
 #    # launcher:
 #    #  n_jobs: 2
 
-seed: 43
+# paths to training and validation data
+data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/train_set/'
+val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_input.npy'
+val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_target.npy'
 
-data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
+# data_utils parameters and settings
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
-input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v6_pervar.nc'
-input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v6_pervar.nc'
-input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v6_pervar.nc'
-output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v6.nc'
-
-val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_input.npy'
-val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_target.npy'
+input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v2_rh_mc_pervar.nc'
+input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v2_rh_mc_pervar.nc'
+input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v2_rh_mc_pervar.nc'
+output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v2_rh_mc.nc'
 variable_subsets: 'v2_rh_mc'
-qinput_log: False
-restart_path: ''
-classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'unet_default_debug'
 
-#climsim_path: '/global/u2/z/zeyuanhu/nvidia_codes/Climsim_private/'
-climsim_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/'
-
-#data_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full_processed/'
-data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
-
-#data_path_climsim_val: '/pscratch/sd/z/zeyuanhu/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full_processed/'
-#data_path_dagger_val: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/preprocessing/dagger2_exp1_iter1_alphap5/ens013/'
-input_mean: 'inputs/input_mean_v6_pervar.nc'
-input_max: 'inputs/input_max_v6_pervar.nc'
-input_min: 'inputs/input_min_v6_pervar.nc'
-output_scale: 'outputs/output_scale_std_lowerthred_v6.nc'
-qc_lbd: 'inputs/qc_exp_lambda_large.txt'
-qi_lbd: 'inputs/qi_exp_lambda_large.txt'
-
-train_input: 'train_input.npy'
-train_target: 'train_target.npy'
-val_input: 'val_input.npy'
-val_target: 'val_target.npy'
-
-
-qinput_prune: True
-qoutput_prune: True
-output_prune: True
+# dataset preprocessing settings
+qinput_prune: True # (bool): Whether to prune the input data
+output_prune: True # (bool): Whether to prune the output data
+strato_lev: 15 # (int): Number of levels in the stratosphere
+qc_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qc_exp_lambda_large.txt'
+# (np.ndarray) coefficients for the exponential transformation of qc
+qi_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qi_exp_lambda_large.txt'
+# (np.ndarray) coefficients for the exponential transformation of qi
+decouple_cloud: False
 aggressive_pruning: False
-strato_lev: 15
-strato_lev_out: 12
 strato_lev_qc: 30
 strato_lev_qinput: 22
 strato_lev_tinput: -1
+strato_lev_out: 12
 input_clip: True
 input_clip_rhonly: True
+# the difference between strato_lev and strato_lev_out is that strato_lev is used as a reference for pruning the input
+# and strato_lev_out is a constant value for pruning the output vector
+
+# training settings
+seed: 43
+restart_path: ''
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/unet/'
+expname: 'unet_debug'
+num_workers: 32
 batch_size: 1024
 epochs: 16
 learning_rate: 0.0001
-optimizer: 'adam'
-weight_decay: 0.00005
-loss: 'huber'
-dt_weight: 1.0
-dq1_weight: 1.0
-dq2_weight: 1.0
-dq3_weight: 1.0
-du_weight: 1.0
-dv_weight: 1.0
-d2d_weight: 1.0
-dice_weight: 1.0
-q_mask_threshold: 0.0
-mse_weight: 1.0
-bce_weight: 1.0
-do_energy_loss: False
-energy_loss_weight: 1.0
-
-dice_flip: False
-unet_num_blocks: 2
-unet_attn_resolutions: [0]
-unet_model_channels: 128
-squeeze_dim: 384
-squeeze_head_dim: 2048
-mlp_hidden_dims: [256, 256, 256, 256, 256, 256, 256, 256, 256]
-mlp_layers: 9
-loc_embedding: False
-skip_conv: False
-prev_2d: False
-lazy_load: False
 save_top_ckpts: 15
 top_ckpt_mode: 'min'
-dropout: 0.0
-decouple_cloud: False
-clip_grad: False
-drop_extreme_samples: False
-drop_extreme_threshold: 500.0
-
-# setup the scheduler with 1. step 2. cosine 3. reducedonplateau
+optimizer: 'AdamW'
+loss: 'Huber'
 scheduler_name: 'step'
 scheduler:
    step:
@@ -145,25 +98,22 @@ scheduler:
       T_0: 5
       T_mult: 1
       eta_min: 1.5e-6
-
 scheduler_warmup: 
    enable: False
    warmup_steps: 20
    warmup_strategy: 'cos'
    init_lr: 1e-7
-
-load_nonjoint_model:
-   enable: False
-   restart_path: ''
-
 early_stop_step: -1
-
 logger: 'wandb'
 wandb:
    project: "climsim3_debugging"
    entity: "cbrain"
 
-mlflow:
-   project: "MLP_test"
-
-num_workers: 32
+# model hyperparameters
+num_blocks: 2
+attn_resolutions: [0]
+model_channels: 128
+dropout: 0.0
+loc_embedding: False
+skip_conv: False
+prev_2d: False

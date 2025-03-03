@@ -12,7 +12,8 @@
 ##SBATCH --output=out_%j.out
 ##SBATCH --error=eo_%j.err
 
-shifter python ../process_data_v2_rh_mc.py \
+cd ..
+shifter python process_data_v2_rh_mc.py \
     'E3SM-MMF.ml2steploc.0004-*-*-*.nc' \
     --data_split 'train' \
     --stride_sample 2 \
