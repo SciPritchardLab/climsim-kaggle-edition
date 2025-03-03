@@ -21,7 +21,7 @@ def main(regexps, data_split, stride_sample, start_idx, save_h5, save_path):
                     normalize = False,
                     input_abbrev='ml2steploc',
                     output_abbrev='mlo',
-                    save_h5 = True) #!!!!!!! don't forget
+                    save_h5 = True)
     print(data_split)
     if data_split == 'test':
         data.data_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/_test/'

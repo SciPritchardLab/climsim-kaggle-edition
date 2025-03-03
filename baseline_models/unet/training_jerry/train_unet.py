@@ -6,8 +6,6 @@ import torch.nn as nn
 from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
-from modulus.metrics.general.mse import mse
-from loss_energy import loss_energy
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
