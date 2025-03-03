@@ -29,14 +29,14 @@ class pao_model_metadata(modulus.ModelMetaData):
 
 class pao_model_nn(modulus.Module):
     def __init__(self,
-                 input_profile_num: int = 9, # number of input profile
-                 input_scalar_num: int = 17, # number of input scalars
-                 target_profile_num: int = 5, # number of target profile
-                 target_scalar_num: int = 8, # number of target scalars
-                 hidden_profile_num: int = 160, # number of hidden units in MLP for profile
-                 hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
+                 input_profile_num: int = 9, # number of input profile variables
+                 input_scalar_num: int = 17, # number of input scalar variables
+                 target_profile_num: int = 5, # number of target profile variables
+                 target_scalar_num: int = 8, # number of target scalar variables
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
+                 hidden_profile_num: int = 160, # number of hidden units in MLP for profile
+                 hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                 ):
         super().__init__(meta = pao_model_metadata())
         self.input_profile_num = input_profile_num
