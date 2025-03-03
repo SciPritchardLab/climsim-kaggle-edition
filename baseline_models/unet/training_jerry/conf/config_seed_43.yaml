@@ -39,45 +39,45 @@
 #    # launcher:
 #    #  n_jobs: 2
 
-seed: 43
-num_workers: 32
-
+# paths to training and validation data
 data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/train_set/'
+val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_input.npy'
+val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_target.npy'
+
+# data_utils parameters and settings
 grid_info: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
 input_mean: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v2_rh_mc_pervar.nc'
 input_max: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v2_rh_mc_pervar.nc'
 input_min: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v2_rh_mc_pervar.nc'
 output_scale: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v2_rh_mc.nc'
+variable_subsets: 'v2_rh_mc'
 
+# dataset preprocessing settings
+qinput_prune: True # dataset setting
+output_prune: True # dataset setting
+strato_lev: 15 # dataset setting
 qc_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qc_exp_lambda_large.txt'
 qi_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qi_exp_lambda_large.txt'
-
-val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_input.npy'
-val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_target.npy'
-variable_subsets: 'v2_rh_mc'
-qinput_prune: True # dataset setting
-qinput_log: False 
-qoutput_prune: True
-output_prune: True # dataset setting
+decouple_cloud: False
 aggressive_pruning: False # dataset setting
-strato_lev: 15
-strato_lev_out: 12
 strato_lev_qc: 30
 strato_lev_qinput: 22
 strato_lev_tinput: -1
+strato_lev_out: 12
 input_clip: True
 input_clip_rhonly: True
-top_ckpt_mode: 'min'
-decouple_cloud: False
 
 # training settings
+seed: 43
 restart_path: ''
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/unet/'
 expname: 'unet_seed_43'
+num_workers: 32
 batch_size: 1024
 epochs: 16
 learning_rate: 0.0001
 save_top_ckpts: 15
+top_ckpt_mode: 'min'
 optimizer: 'AdamW'
 loss: 'Huber'
 scheduler_name: 'step'

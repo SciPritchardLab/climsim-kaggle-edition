@@ -20,7 +20,7 @@ class data_utils:
                  input_max,
                  input_min,
                  output_scale,
-                 qinput_log,
+                 qinput_log = False,
                  normalize = True,
                  input_abbrev = 'mlis',
                  output_abbrev = 'mlos',
