@@ -55,7 +55,7 @@ variable_subsets: 'v2_rh_mc'
 qinput_prune: True # (bool): Whether to prune the input data
 output_prune: True # (bool): Whether to prune the output data
 strato_lev: 15 # (int): Number of levels in the stratosphere
-qn_lbd: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qn_exp_lambda_large.txt'
+qn_lbd_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qn_exp_lambda_large.txt'
 # (np.ndarray) coefficients for the exponential transformation of qn
 decouple_cloud: False
 aggressive_pruning: False

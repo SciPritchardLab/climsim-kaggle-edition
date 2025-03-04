@@ -107,7 +107,7 @@ class UnetModel(modulus.Module):
         self.vertical_level_num = vertical_level_num
         self.input_padding = (seq_resolution-vertical_level_num,0)
         self.output_prune=output_prune
-        self.strato_lev=strato_lev
+        self.strato_lev_out=strato_lev_out
         self.loc_embedding = loc_embedding
         self.skip_conv = skip_conv
         self.prev_2d = prev_2d
@@ -399,23 +399,23 @@ class UnetModel(modulus.Module):
         # print('7:', x.shape)
         #extracts the transformed x_profile and x_scalar from x
         if self.input_padding[1]==0:
-            y_profile = x[:,:self.input_profile_num_out,self.input_padding[0]:]
-            y_scalar = x[:,self.input_profile_num_out:,self.input_padding[0]:]
+            y_profile = x[:,:self.target_profile_num,self.input_padding[0]:]
+            y_scalar = x[:,self.target_profile_num:,self.input_padding[0]:]
         else:
-            y_profile = x[:,:self.input_profile_num_out,self.input_padding[0]:-self.input_padding[1]]
-            y_scalar = x[:,self.input_profile_num_out:,self.input_padding[0]:-self.input_padding[1]]
+            y_profile = x[:,:self.target_profile_num,self.input_padding[0]:-self.input_padding[1]]
+            y_scalar = x[:,self.target_profile_num:,self.input_padding[0]:-self.input_padding[1]]
 
         #take relu on y_scalar
         y_scalar = torch.nn.functional.relu(y_scalar)
-        #reshape y_profile to (batch, input_profile_num_out*levels)
-        y_profile = y_profile.reshape(-1, self.input_profile_num_out*self.vertical_level_num)
+        #reshape y_profile to (batch, target_profile_num*levels)
+        y_profile = y_profile.reshape(-1, self.target_profile_num*self.vertical_level_num)
 
-        #average y_scalar for the lev dimension to (batch, input_scalar_num_out)
+        #average y_scalar for the lev dimension to (batch, target_scalar_num)
         #take the average scalar over the levels
         y_scalar = y_scalar.mean(dim=2)
         # print('7.5:', y_profile.shape, y_scalar.shape)
 
-        #concatenate y_profile and y_scalar to (batch, input_profile_num_out*levels+input_scalar_num_out)
+        #concatenate y_profile and y_scalar to (batch, target_profile_num*levels+target_scalar_num)
         y = torch.cat((y_profile, y_scalar), dim=1)
 
         #prunes the stratosphere values
