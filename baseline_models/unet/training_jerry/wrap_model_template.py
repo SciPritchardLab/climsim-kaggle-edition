@@ -9,23 +9,23 @@ import modulus
 from pao_model import pao_model_nn
 import pao_model as pao_model
 
-input_mean_file = 'input_mean_v6_pervar.nc'
-input_max_file = 'input_max_v6_pervar.nc'
-input_min_file = 'input_min_v6_pervar.nc'
-output_scale_file = 'output_scale_std_lowerthred_v6.nc'
-lbd_qn_file = 'qn_exp_lambda_large.txt'
+input_mean_file = 'input_mean_v2_rh_mc_pervar.nc'
+input_max_file = 'input_max_v2_rh_mc_pervar.nc'
+input_min_file = 'input_min_v2_rh_mc_pervar.nc'
+output_scale_file = 'output_scale_std_lowerthred_v2_rh_mc.nc'
+qn_lbd_file = 'qn_exp_lambda_large.txt'
 
 grid_path = '../../../grid_info/ClimSim_low-res_grid-info.nc'
 
-f_torch_model = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/model.mdlus'
-save_file_torch = os.path.join('/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/wrapped/', 'wrapped_model.pt')
+f_torch_model = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/model_path/model.mdlus'
+save_file_torch = os.path.join('/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/model_path/wrapped/', 'wrapped_model.pt')
 
 grid_info = xr.open_dataset(grid_path)
 input_mean = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_mean_file)
 input_max = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_max_file)
 input_min = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_min_file)
 output_scale = xr.open_dataset('../../../preprocessing/normalizations/outputs/' + output_scale_file)
-lbd_qn = np.loadtxt('../../../preprocessing/normalizations/inputs/' + lbd_qn_file, delimiter = ',')
+qn_lbd = np.loadtxt('../../../preprocessing/normalizations/inputs/' + qn_lbd_file, delimiter = ',')
 
 data = data_utils(grid_info = grid_info, 
                   input_mean = input_mean, 
@@ -34,25 +34,26 @@ data = data_utils(grid_info = grid_info,
                   output_scale = output_scale,
                   qinput_log=False,
                   normalize=False)
+
 data.set_to_v2_rh_mc_vars()
 
 input_sub, input_div, out_scale = data.save_norm(write = False)
 
 class WrappedModel(nn.Module):
-    def __init__(self, original_model, input_sub, input_div, out_scale, lbd_qn):
+    def __init__(self, original_model, input_sub, input_div, out_scale, qn_lbd):
         super(WrappedModel, self).__init__()
         self.original_model = original_model
         self.input_sub = torch.tensor(input_sub, dtype=torch.float32, device = torch.device('cuda'))
         self.input_div = torch.tensor(input_div, dtype=torch.float32, device = torch.device('cuda'))
         self.out_scale = torch.tensor(out_scale, dtype=torch.float32, device = torch.device('cuda'))
-        self.lbd_qn = torch.tensor(lbd_qn, dtype=torch.float32, device = torch.device('cuda'))
+        self.qn_lbd = torch.tensor(qn_lbd, dtype=torch.float32, device = torch.device('cuda'))
 
     def to(self, device):
         """Ensure all tensors are moved to the correct device"""
         self.input_sub = self.input_sub.to(device)
         self.input_div = self.input_div.to(device)
         self.out_scale = self.out_scale.to(device)
-        self.lbd_qn = self.lbd_qn.to(device)
+        self.qn_lbd = self.qn_lbd.to(device)
         return super().to(device)
     
     def apply_temperature_rules(self, T):
@@ -80,13 +81,14 @@ class WrappedModel(nn.Module):
         x = xout_new
         
         #do input normalization
-        x[:,120:180] = 1 - torch.exp(-x[:,120:180] * self.lbd_qn.to(x.device))
+        x[:,120:180] = 1 - torch.exp(-x[:,120:180] * self.qn_lbd.to(x.device))
         x = (x - self.input_sub.to(x.device)) / self.input_div.to(x.device)
         x = torch.where(torch.isnan(x), torch.tensor(0.0, device=x.device), x)
         x = torch.where(torch.isinf(x), torch.tensor(0.0, device=x.device), x)
         
         #prune top 15 levels in qn input
         x[:,120:120+15] = 0
+        x[:,180:180+15] = 0
         #clip rh input
         x[:, 60:120] = torch.clamp(x[:, 60:120], 0, 1.2)
 
@@ -128,7 +130,7 @@ class WrappedModel(nn.Module):
 
 device = torch.device("cuda")
 model_inf = modulus.Module.from_checkpoint(f_torch_model).to(device)
-wrapped_model = WrappedModel(model_inf, input_sub, input_div, out_scale, lbd_qn).to(device)
+wrapped_model = WrappedModel(model_inf, input_sub, input_div, out_scale, qn_lbd).to(device)
 WrappedModel.device = "cuda"
 device = torch.device("cuda")
 scripted_model = torch.jit.script(wrapped_model)

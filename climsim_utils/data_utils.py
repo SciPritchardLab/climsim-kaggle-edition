@@ -1143,7 +1143,6 @@ class data_utils:
                 ds_target = ds_target.stack({'batch':{'ncol'}})
                 ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name=self.output_abbrev)
                 yield (ds_input.values, ds_target.values)
-
         return gen()
     
     def save_as_npy(self,
@@ -1185,7 +1184,6 @@ class data_utils:
             z = zarr.open(zarr_path, mode='w', shape=npy_input.shape, dtype=npy_input.dtype, chunks=(100, npy_input.shape[1]))
             z[:] = npy_input
 
-        
         del npy_input
         
         npy_target = np.concatenate([data_list[x][1] for x in range(len(data_list))])
@@ -1205,7 +1203,6 @@ class data_utils:
             zarr_path = save_path + data_split + '_target.zarr'
             z = zarr.open(zarr_path, mode='w', shape=npy_target.shape, dtype=npy_target.dtype, chunks=(100, npy_target.shape[1]))
             z[:] = npy_target
-
 
         if data_split == 'train':
             data_files = self.train_filelist
@@ -1254,7 +1251,6 @@ class data_utils:
                 #ds_target = ds_target.stack({'batch':{'ncol'}})
                 #ds_target = ds_target.to_stacked_array('mlvar', sample_dims=['batch'], name='mlos')
                 yield ds_input.values #ds_target.values)
-
         return gen()
 
     def save_as_npy_inputonly(self,
@@ -1274,7 +1270,6 @@ class data_utils:
         # add "/" to the end of save_path if it does not exist
         if save_path[-1] != '/':
             save_path = save_path + '/'
-
 
         with open(save_path + data_split + '_input.npy', 'wb') as f:
             np.save(f, np.float32(npy_input))
@@ -1339,7 +1334,6 @@ class data_utils:
         if write:
             np.savetxt(save_path + '/out_scale.txt', out_scale.reshape(1, -1), fmt=fmt, delimiter=',')
         return input_sub, input_div, out_scale
-
 
     @staticmethod
     def ls(dir_path = ''):
