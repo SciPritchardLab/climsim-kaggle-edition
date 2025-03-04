@@ -20,14 +20,14 @@ class TrainingDataset(Dataset):
                  output_prune, 
                  strato_lev,
                  qn_lbd,
-                 decouple_cloud=False, 
-                 aggressive_pruning=False,
-                 strato_lev_qc=30,
-                 strato_lev_qinput=None, 
-                 strato_lev_tinput=None,
+                 decouple_cloud = False, 
+                 aggressive_pruning = False,
+                 strato_lev_qc = 30,
+                 strato_lev_qinput = 22, 
+                 strato_lev_tinput = -1,
                  strato_lev_out = 12,
-                 input_clip=False,
-                 input_clip_rhonly=False,):
+                 input_clip = True,
+                 input_clip_rhonly = True,):
         """
         Args:
             parent_path (str): Path to the .zarr file containing the inputs and targets.
@@ -125,7 +125,7 @@ class TrainingDataset(Dataset):
 
         # x = np.load(self.input_paths,mmap_mode='r')[idx]
         # y = np.load(self.target_paths,mmap_mode='r')[idx]
-        x[120:180] = 1 - np.exp(-x[120:180] * self.qc_lbd)
+        x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
         # Avoid division by zero in input_div and set corresponding x to 0
         # input_div_nonzero = self.input_div != 0
         # x = np.where(input_div_nonzero, (x - self.input_sub) / self.input_div, 0)
@@ -168,33 +168,31 @@ class TrainingDataset(Dataset):
             y[120:120+self.strato_lev_out] = 0
             y[180:180+self.strato_lev_out] = 0
             y[240:240+self.strato_lev_out] = 0
-            y[300:300+self.strato_lev_out] = 0
         return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
 class ValidationDataset(Dataset):
     def __init__(self, 
-                 input_paths, 
-                 target_paths, 
+                 val_input_path, 
+                 val_target_path, 
                  input_sub, 
                  input_div, 
                  out_scale, 
                  qinput_prune, 
                  output_prune, 
                  strato_lev,
-                 qc_lbd,
-                 qi_lbd, 
-                 decouple_cloud=False, 
-                 aggressive_pruning=False,
-                 strato_lev_qc=30,
-                 strato_lev_qinput=None, 
-                 strato_lev_tinput=None,
+                 qn_lbd,
+                 decouple_cloud = False, 
+                 aggressive_pruning = False,
+                 strato_lev_qc = 30,
+                 strato_lev_qinput = 22, 
+                 strato_lev_tinput = -1,
                  strato_lev_out = 12,
-                 input_clip=False,
-                 input_clip_rhonly=False,):
+                 input_clip = True,
+                 input_clip_rhonly = True,):
         """
         Args:
-            input_paths (str): Path to the .npy file containing the inputs.
-            target_paths (str): Path to the .npy file containing the targets.
+            val_input_path (str): Path to the .npy file containing the inputs.
+            val_target_path (str): Path to the .npy file containing the targets.
             input_sub (np.ndarray): Input data mean.
             input_div (np.ndarray): Input data standard deviation.
             out_scale (np.ndarray): Output data standard deviation.
@@ -203,18 +201,15 @@ class ValidationDataset(Dataset):
             strato_lev (int): Number of levels in the stratosphere.
             qn_lbd (np.ndarray): Coefficients for the exponential transformation of qn.
         """
-        self.inputs = np.load(input_paths)
-        self.targets = np.load(target_paths)
-        self.input_paths = input_paths
-        self.target_paths = target_paths
+        self.val_input = np.load(val_input_path)
+        self.val_target = np.load(val_target_path)
         self.input_sub = input_sub
         self.input_div = input_div
         self.out_scale = out_scale
         self.qinput_prune = qinput_prune
         self.output_prune = output_prune
         self.strato_lev = strato_lev
-        self.qc_lbd = qc_lbd
-        self.qi_lbd = qi_lbd
+        self.qn_lbd = qn_lbd
         self.decouple_cloud = decouple_cloud
         self.aggressive_pruning = aggressive_pruning
         self.strato_lev_qc = strato_lev_qc
@@ -236,8 +231,6 @@ class ValidationDataset(Dataset):
     def __getitem__(self, idx):
         x = self.inputs[idx]
         y = self.targets[idx]
-        # x = np.load(self.input_paths,mmap_mode='r')[idx]
-        # y = np.load(self.target_paths,mmap_mode='r')[idx]
         x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
         # Avoid division by zero in input_div and set corresponding x to 0
         # input_div_nonzero = self.input_div != 0
@@ -297,6 +290,5 @@ class ValidationDataset(Dataset):
             y[120:120+self.strato_lev_out] = 0
             y[180:180+self.strato_lev_out] = 0
             y[240:240+self.strato_lev_out] = 0
-            y[300:300+self.strato_lev_out] = 0
         return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 

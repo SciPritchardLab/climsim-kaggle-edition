@@ -88,7 +88,6 @@ class WrappedModel(nn.Module):
         
         #prune top 15 levels in qn input
         x[:,120:120+15] = 0
-        x[:,180:180+15] = 0
         #clip rh input
         x[:, 60:120] = torch.clamp(x[:, 60:120], 0, 1.2)
 

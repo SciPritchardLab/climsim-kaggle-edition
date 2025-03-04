@@ -41,26 +41,25 @@ class UnetModel(modulus.Module):
             target_scalar_num: int = 8, # number of target scalar variables
             vertical_level_num: int = 60, # number of vertical levels
             output_prune: bool = True,
-            strato_lev_out: int = 12, 
+            strato_lev_out: int = 12,
+            dropout: float = 0.0,
             loc_embedding: bool = False,
+            embedding_type: str = "positional",
+            num_blocks: int = 2,
+            attn_resolutions: List[int] = [0],
+            model_channels: int = 128,
+            skip_conv: bool = False,
+            prev_2d: bool = False,
             seq_resolution: int = 64,
             label_dim: int = 0,
             augment_dim: int = 0,
-            model_channels: int = 128,
             channel_mult: List[int] = [1, 2, 2, 2],
             channel_mult_emb: int = 4,
-            num_blocks: int = 4,
-            attn_resolutions: List[int] = [16],
-            dropout: float = 0.10,
             label_dropout: float = 0.0,
-            embedding_type: str = "positional",
             channel_mult_noise: int = 1,
             encoder_type: str = "standard",
             decoder_type: str = "standard",
             resample_filter: List[int] = [1, 1],
-            # qinput_prune=False, 
-            skip_conv: bool = False,
-            prev_2d: bool = False
             ):
         
         super().__init__(meta=UnetMetaData())
@@ -107,7 +106,6 @@ class UnetModel(modulus.Module):
         self.resample_filter = resample_filter
         self.vertical_level_num = vertical_level_num
         self.input_padding = (seq_resolution-vertical_level_num,0)
-        # self.qinput_prune=qinput_prune
         self.output_prune=output_prune
         self.strato_lev=strato_lev
         self.loc_embedding = loc_embedding

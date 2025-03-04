@@ -31,25 +31,18 @@ def main(cfg: DictConfig) -> float:
     DistributedManager.initialize()
     dist = DistributedManager()
 
-    grid_path = cfg.climsim_path+'/grid_info/ClimSim_low-res_grid-info.nc'
-    norm_path = cfg.climsim_path+'/preprocessing/normalizations/'
-    grid_info = xr.open_dataset(cfg.grid_info)
-    input_mean = xr.open_dataset(cfg.input_mean)
-    input_max = xr.open_dataset(cfg.input_max)
-    input_min = xr.open_dataset(cfg.input_min)
-    output_scale = xr.open_dataset(cfg.output_scale)
-    # qc_lbd = xr.open_dataset(norm_path + cfg.qc_lbd)
-    # qi_lbd = xr.open_dataset(norm_path + cfg.qi_lbd)
-
-    lbd_qc = np.loadtxt(cfg.qc_lbd, delimiter=',')
-    lbd_qi = np.loadtxt(cfg.qi_lbd, delimiter=',')
+    grid_info = xr.open_dataset(cfg.grid_info_path)
+    input_mean = xr.open_dataset(cfg.input_mean_path)
+    input_max = xr.open_dataset(cfg.input_max_path)
+    input_min = xr.open_dataset(cfg.input_min_path)
+    output_scale = xr.open_dataset(cfg.output_scale_path)
+    qn_lbd = np.loadtxt(cfg.qn_lbd, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 
-                  input_mean = input_mean, 
-                  input_max = input_max, 
-                  input_min = input_min, 
-                  output_scale = output_scale,
-                  qinput_log=cfg.qinput_log)
+                      input_mean = input_mean, 
+                      input_max = input_max, 
+                      input_min = input_min, 
+                      output_scale = output_scale)
 
     # set variables to subset
     if cfg.variable_subsets == 'v1':
@@ -76,39 +69,22 @@ def main(cfg: DictConfig) -> float:
 
     input_sub, input_div, out_scale = data.save_norm(write=False)
 
-    # Create dataset instances
-    # check if cfg.data_path + cfg.train_input exist
-    # if os.path.exists(cfg.data_path + cfg.train_input):
-    #     train_input_path = cfg.data_path + cfg.train_input
-    #     train_target_path = cfg.data_path + cfg.train_target
-    # else:
-    #     #make train_input_path a list of all paths of cfg.data_path +'/*/'+cfg.train_input
-    #     train_input_path = [f for f in glob.glob(cfg.data_path +'/*/'+cfg.train_input)]
-    #     train_target_path = [f for f in glob.glob(cfg.data_path +'/*/'+cfg.train_target)]
-
-    # print(train_input_path)
-
-    val_input_path = cfg.val_input
-    val_target_path = cfg.val_target
-    if not os.path.exists(cfg.val_input):
-        raise ValueError('Validation input path does not exist')
-    if not os.path.exists(cfg.val_target):
-        raise ValueError('Validation target path does not exist')
-
-    #choose dataset class based on cfg.lazy_load
-    # if cfg.lazy_load:
-    #     if isinstance(train_input_path, list):
-    #         dataset_class = climsim_dataset_lazy_list
-    #     else:
-    #         dataset_class = climsim_dataset_lazy
-    # else:
-    #     dataset_class = climsim_dataset
-    
-    #train_dataset = dataset_class(train_input_path, train_target_path, input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, cfg.strato_lev, lbd_qc, lbd_qi)
-    train_dataset = TrainingDataset(cfg.data_path, \
-                                    input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, \
-                                        cfg.strato_lev, lbd_qc, lbd_qi, cfg.decouple_cloud, cfg.aggressive_pruning, \
-                                            cfg.strato_lev_qc, cfg.strato_lev_qinput, cfg.strato_lev_tinput, cfg.strato_lev_out, cfg.input_clip, cfg.input_clip_rhonly)
+    train_dataset = TrainingDataset(parent_path = cfg.data_path,
+                                    input_sub = input_sub,
+                                    input_div = input_div,
+                                    out_scale = out_scale,
+                                    qinput_prune = cfg.qinput_prune,
+                                    output_prune = cfg.output_prune,
+                                    strato_lev = cfg.strato_lev,
+                                    qn_lbd = cfg.qn_lbd,
+                                    decouple_cloud = cfg.decouple_cloud,
+                                    aggressive_pruning = cfg.aggressive_pruning,
+                                    strato_lev_qc = cfg.strato_lev_qc,
+                                    strato_lev_qinput = cfg.strato_lev_qinput,
+                                    strato_lev_tinput = cfg.strato_lev_tinput,
+                                    strato_lev_out = cfg.strato_lev_out,
+                                    input_clip = cfg.input_clip,
+                                    input_clip_rhonly = cfg.input_clip_rhonly)
             
     train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
     
@@ -120,9 +96,23 @@ def main(cfg: DictConfig) -> float:
                                 pin_memory=torch.cuda.is_available(),
                                 num_workers=cfg.num_workers)
 
-    val_dataset = ValidationDataset(val_input_path, val_target_path, input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, \
-                                  cfg.strato_lev, lbd_qc, lbd_qi, cfg.decouple_cloud, cfg.aggressive_pruning, \
-                                    cfg.strato_lev_qc, cfg.strato_lev_qinput, cfg.strato_lev_tinput, cfg.strato_lev_out, cfg.input_clip, cfg.input_clip_rhonly)
+    val_dataset = ValidationDataset(val_input_path = cfg.val_input_path,
+                                    val_target_path = cfg.val_target_path,
+                                    input_sub = input_sub,
+                                    input_div = input_div,
+                                    out_scale = out_scale,
+                                    qinput_prune = cfg.qinput_prune,
+                                    output_prune = cfg.output_prune,
+                                    strato_lev = cfg.strato_lev,
+                                    qn_lbd = cfg.qn_lbd,
+                                    decouple_cloud = cfg.decouple_cloud,
+                                    aggressive_pruning = cfg.aggressive_pruning,
+                                    strato_lev_qc = cfg.strato_lev_qc,
+                                    strato_lev_qinput = cfg.strato_lev_qinput,
+                                    strato_lev_tinput = cfg.strato_lev_tinput,
+                                    strato_lev_out = cfg.strato_lev_out,
+                                    input_clip = cfg.input_clip,
+                                    input_clip_rhonly = cfg.input_clip_rhonly)
 
     #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
     val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
@@ -149,30 +139,31 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    tmp_unet_model_channels = 
-    tmp_output_prune = cfg.output_prune
-    tmp_strato_lev = cfg.strato_lev_out
-    tmp_loc_embedding = cfg.loc_embedding
-    tmp_skip_conv = cfg.skip_conv
-    tmp_prev_2d = cfg.prev_2d
-    tmp_dropout = cfg.dropout
-
     model = UnetModel(
-        num_vars_profile = input_size//60,
-        num_vars_scalar = input_size%60,
-        num_vars_profile_out = output_size//60,
-        num_vars_scalar_out = output_size%60,
-        seq_resolution = 64,
-        model_channels = int(cfg.model_channels),
-        channel_mult = [1, 2, 2, 2],
-        num_blocks = int(cfg.num_blocks),
-        attn_resolutions = [i for i in cfg.attn_resolutions],
+        input_profile_num = data.input_profile_num,
+        input_scalar_num = data.input_scalar_num,
+        target_profile_num = data.target_profile_num,
+        target_scalar_num = data.target_scalar_num,
+        output_prune = cfg.output_prune,
+        strato_lev = cfg.strato_lev_out,
         dropout = cfg.dropout,
-        output_prune=tmp_output_prune,
-        strato_lev=tmp_strato_lev,
-        loc_embedding=tmp_loc_embedding,
-        skip_conv=tmp_skip_conv,
-        prev_2d=tmp_prev_2d
+        loc_embedding = cfg.loc_embedding,
+        embedding_type = cfg.embedding_type,
+        num_blocks = cfg.num_blocks,
+        attn_resolutions = cfg.attn_resolutions,
+        model_channels = cfg.model_channels,
+        skip_conv = cfg.skip_conv,
+        prev_2d = cfg.prev_2d,
+        seq_resolution = cfg.seq_resolution,
+        label_dim = cfg.label_dim,
+        augment_dim = cfg.augment_dim,
+        channel_mult = cfg.channel_mult,
+        channel_mult_emb = cfg.channel_mult_emb,
+        label_dropout = cfg.label_dropout,
+        cahnnel_mult_noise = cfg.channel_mult_noise,
+        encoder_type = cfg.encoder_type,
+        decoder_type = cfg.decoder_type,
+        resample_filter = cfg.resample_filter,
     ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
