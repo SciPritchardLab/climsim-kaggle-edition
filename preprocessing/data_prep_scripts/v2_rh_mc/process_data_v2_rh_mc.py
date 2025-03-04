@@ -37,7 +37,7 @@ def main(regexps, data_split, stride_sample, start_idx, save_h5, save_path):
     # else:
     #     regexps = [regexps]
     print(regexps)
-    data.set_regexps(data_split = data_split, regexps=regexps)
+    data.set_regexps(data_split = data_split, regexps = regexps)
     data.set_stride_sample(data_split = data_split, stride_sample = stride_sample)
     data.set_filelist(data_split = data_split, start_idx = start_idx)
     #if savepath not exist, create it

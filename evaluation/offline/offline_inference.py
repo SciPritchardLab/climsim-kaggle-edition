@@ -86,6 +86,7 @@ def preprocessing_v2_rh_mc(data, input_path, target_path):
     npy_input = np.where(np.isnan(npy_input), 0, npy_input)
     npy_input = np.where(np.isinf(npy_input), 0, npy_input)
     npy_input[:,120:120+15] = 0
+    npy_input[:,180:180+15] = 0
     npy_input[:,60:120] = np.clip(npy_input[:,60:120], 0, 1.2)
     torch_input = torch.tensor(npy_input).float()
     reshaped_target = npy_target.reshape(-1, data.num_latlon, data.target_feature_len)
@@ -107,6 +108,10 @@ for model_name in model_paths.keys():
         for i in tqdm(range(0, torch_input.shape[0], batch_size)):
             batch = torch_input[i : i + batch_size, :].to(device)
             model_batch_pred = model(batch) # inference on batch
+            model_batch_pred[:, 60:75] = 0
+            model_batch_pred[:, 120:135] = 0
+            model_batch_pred[:, 180:195] = 0
+            model_batch_pred[:, 240:255] = 0
             model_batch_pred_list.append(model_batch_pred.cpu().numpy() / out_scale)
     model_preds[model_name] = np.stack(model_batch_pred_list, axis = 0) # 0 axis corresponds to time
     np.save(preds_path + f'{model_name}_preds.npy', model_preds[model_name])

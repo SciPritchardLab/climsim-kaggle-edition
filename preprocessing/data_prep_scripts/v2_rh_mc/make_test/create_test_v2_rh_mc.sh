@@ -22,4 +22,4 @@ shifter python process_data_v2_rh_mc.py \
     --stride_sample 12 \
     --start_idx 1 \
     --save_h5 True \
-    --save_path '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/scoring_set/'
+    --save_path '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/test_set/'

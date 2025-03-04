@@ -19,8 +19,7 @@ class TrainingDataset(Dataset):
                  qinput_prune, 
                  output_prune, 
                  strato_lev,
-                 qc_lbd,
-                 qi_lbd, 
+                 qn_lbd,
                  decouple_cloud=False, 
                  aggressive_pruning=False,
                  strato_lev_qc=30,
@@ -38,8 +37,7 @@ class TrainingDataset(Dataset):
             qinput_prune (bool): Whether to prune the input data.
             output_prune (bool): Whether to prune the output data.
             strato_lev (int): Number of levels in the stratosphere.
-            qc_lbd (np.ndarray): Coefficients for the exponential transformation of qc.
-            qi_lbd (np.ndarray): Coefficients for the exponential transformation of qi.
+            qn_lbd (np.ndarray): Coefficients for the exponential transformation of qn.
         """
         self.parent_path = parent_path
         self.input_paths = glob.glob(f'{parent_path}/**/train_input.h5', recursive=True)
@@ -75,8 +73,7 @@ class TrainingDataset(Dataset):
         self.qinput_prune = qinput_prune
         self.output_prune = output_prune
         self.strato_lev = strato_lev
-        self.qc_lbd = qc_lbd
-        self.qi_lbd = qi_lbd
+        self.qn_lbd = qn_lbd
         self.decouple_cloud = decouple_cloud
         self.aggressive_pruning = aggressive_pruning
         self.strato_lev_qc = strato_lev_qc
@@ -129,7 +126,6 @@ class TrainingDataset(Dataset):
         # x = np.load(self.input_paths,mmap_mode='r')[idx]
         # y = np.load(self.target_paths,mmap_mode='r')[idx]
         x[120:180] = 1 - np.exp(-x[120:180] * self.qc_lbd)
-        x[180:240] = 1 - np.exp(-x[180:240] * self.qi_lbd)
         # Avoid division by zero in input_div and set corresponding x to 0
         # input_div_nonzero = self.input_div != 0
         # x = np.where(input_div_nonzero, (x - self.input_sub) / self.input_div, 0)
@@ -164,6 +160,8 @@ class TrainingDataset(Dataset):
                 x[60:120] = np.clip(x[60:120], 0, 1.2)
             else:
                 x[60:120] = np.clip(x[60:120], 0, 1.2) # for RH, clip to (0,1.2)
+                x[360:720] = np.clip(x[360:720], -0.5, 0.5) # for dyn forcing, clip to (-0.5,0.5)
+                x[720:1320] = np.clip(x[720:1320], -3, 3) # for phy tendencies  clip to (-3,3)
 
         if self.output_prune:
             y[60:60+self.strato_lev_out] = 0
@@ -203,8 +201,7 @@ class ValidationDataset(Dataset):
             qinput_prune (bool): Whether to prune the input data.
             output_prune (bool): Whether to prune the output data.
             strato_lev (int): Number of levels in the stratosphere.
-            qc_lbd (np.ndarray): Coefficients for the exponential transformation of qc.
-            qi_lbd (np.ndarray): Coefficients for the exponential transformation of qi.
+            qn_lbd (np.ndarray): Coefficients for the exponential transformation of qn.
         """
         self.inputs = np.load(input_paths)
         self.targets = np.load(target_paths)
@@ -241,8 +238,7 @@ class ValidationDataset(Dataset):
         y = self.targets[idx]
         # x = np.load(self.input_paths,mmap_mode='r')[idx]
         # y = np.load(self.target_paths,mmap_mode='r')[idx]
-        x[120:180] = 1 - np.exp(-x[120:180] * self.qc_lbd)
-        x[180:240] = 1 - np.exp(-x[180:240] * self.qi_lbd)
+        x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
         # Avoid division by zero in input_div and set corresponding x to 0
         # input_div_nonzero = self.input_div != 0
         # x = np.where(input_div_nonzero, (x - self.input_sub) / self.input_div, 0)
