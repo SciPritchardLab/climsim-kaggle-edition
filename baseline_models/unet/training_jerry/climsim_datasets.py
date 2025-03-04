@@ -224,9 +224,10 @@ class ValidationDataset(Dataset):
 
         if self.strato_lev_qinput <self.strato_lev:
             raise ValueError('strato_lev_qinput should be greater than or equal to strato_lev, otherwise inconsistent with E3SM')
+        assert len(self.val_input) == len(self.val_target)
 
     def __len__(self):
-        return len(self.inputs)
+        return len(self.val_input)
 
     def __getitem__(self, idx):
         x = self.inputs[idx]

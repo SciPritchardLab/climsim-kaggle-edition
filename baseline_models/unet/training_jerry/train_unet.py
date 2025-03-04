@@ -36,7 +36,7 @@ def main(cfg: DictConfig) -> float:
     input_max = xr.open_dataset(cfg.input_max_path)
     input_min = xr.open_dataset(cfg.input_min_path)
     output_scale = xr.open_dataset(cfg.output_scale_path)
-    qn_lbd = np.loadtxt(cfg.qn_lbd, delimiter=',')
+    qn_lbd = np.loadtxt(cfg.qn_lbd_path, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 
                       input_mean = input_mean, 
@@ -76,7 +76,7 @@ def main(cfg: DictConfig) -> float:
                                     qinput_prune = cfg.qinput_prune,
                                     output_prune = cfg.output_prune,
                                     strato_lev = cfg.strato_lev,
-                                    qn_lbd = cfg.qn_lbd,
+                                    qn_lbd = qn_lbd,
                                     decouple_cloud = cfg.decouple_cloud,
                                     aggressive_pruning = cfg.aggressive_pruning,
                                     strato_lev_qc = cfg.strato_lev_qc,
@@ -104,7 +104,7 @@ def main(cfg: DictConfig) -> float:
                                     qinput_prune = cfg.qinput_prune,
                                     output_prune = cfg.output_prune,
                                     strato_lev = cfg.strato_lev,
-                                    qn_lbd = cfg.qn_lbd,
+                                    qn_lbd = qn_lbd,
                                     decouple_cloud = cfg.decouple_cloud,
                                     aggressive_pruning = cfg.aggressive_pruning,
                                     strato_lev_qc = cfg.strato_lev_qc,
@@ -145,7 +145,7 @@ def main(cfg: DictConfig) -> float:
         target_profile_num = data.target_profile_num,
         target_scalar_num = data.target_scalar_num,
         output_prune = cfg.output_prune,
-        strato_lev = cfg.strato_lev_out,
+        strato_lev_out = cfg.strato_lev_out,
         dropout = cfg.dropout,
         loc_embedding = cfg.loc_embedding,
         embedding_type = cfg.embedding_type,
@@ -160,7 +160,7 @@ def main(cfg: DictConfig) -> float:
         channel_mult = cfg.channel_mult,
         channel_mult_emb = cfg.channel_mult_emb,
         label_dropout = cfg.label_dropout,
-        cahnnel_mult_noise = cfg.channel_mult_noise,
+        channel_mult_noise = cfg.channel_mult_noise,
         encoder_type = cfg.encoder_type,
         decoder_type = cfg.decoder_type,
         resample_filter = cfg.resample_filter,
@@ -236,7 +236,7 @@ def main(cfg: DictConfig) -> float:
         initialize_wandb(
             project=cfg.wandb.project,
             name=cfg.expname,
-            entity="zeyuan_hu",
+            entity=cfg.wandb.entity,
             mode="online",
         )
         LaunchLogger.initialize(use_wandb=True)
