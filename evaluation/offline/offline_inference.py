@@ -86,7 +86,6 @@ def preprocessing_v2_rh_mc(data, input_path, target_path):
     npy_input = np.where(np.isnan(npy_input), 0, npy_input)
     npy_input = np.where(np.isinf(npy_input), 0, npy_input)
     npy_input[:,120:120+15] = 0
-    npy_input[:,180:180+15] = 0
     npy_input[:,60:120] = np.clip(npy_input[:,60:120], 0, 1.2)
     torch_input = torch.tensor(npy_input).float()
     reshaped_target = npy_target.reshape(-1, data.num_latlon, data.target_feature_len)
