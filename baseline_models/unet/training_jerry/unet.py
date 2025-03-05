@@ -24,55 +24,54 @@ Contains the code for the Unet and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class ClimsimUnetMetaData(modulus.ModelMetaData):
-    name: str = "ClimsimUnet"
+class UnetMetaData(modulus.ModelMetaData):
+    name: str = "unet"
     # Optimization
     jit: bool = True
     cuda_graphs: bool = True
     amp_cpu: bool = False
     amp_gpu: bool = False
 
-class ClimsimUnet(modulus.Module):
+class UnetModel(modulus.Module):
     def __init__(
             self, 
-            num_vars_profile: int,
-            num_vars_scalar: int, 
-            num_vars_profile_out: int,
-            num_vars_scalar_out: int, 
+            input_profile_num: int = 9, # number of input profile variables
+            input_scalar_num: int = 17, # number of input scalar variables
+            target_profile_num: int = 5, # number of target profile variables
+            target_scalar_num: int = 8, # number of target scalar variables
+            vertical_level_num: int = 60, # number of vertical levels
+            output_prune: bool = True,
+            strato_lev_out: int = 12,
+            dropout: float = 0.0,
+            loc_embedding: bool = False,
+            embedding_type: str = "positional",
+            num_blocks: int = 2,
+            attn_resolutions: List[int] = [0],
+            model_channels: int = 128,
+            skip_conv: bool = False,
+            prev_2d: bool = False,
             seq_resolution: int = 64,
             label_dim: int = 0,
             augment_dim: int = 0,
-            model_channels: int = 128,
             channel_mult: List[int] = [1, 2, 2, 2],
             channel_mult_emb: int = 4,
-            num_blocks: int = 4,
-            attn_resolutions: List[int] = [16],
-            dropout: float = 0.10,
             label_dropout: float = 0.0,
-            embedding_type: str = "positional",
             channel_mult_noise: int = 1,
             encoder_type: str = "standard",
             decoder_type: str = "standard",
             resample_filter: List[int] = [1, 1],
-            n_model_levels: int = 60,
-            # qinput_prune=False, 
-            output_prune=False, 
-            strato_lev=12,
-            loc_embedding: bool = False,
-            skip_conv: bool = False,
-            prev_2d: bool = False
             ):
         
-        super().__init__(meta=ClimsimUnetMetaData())
+        super().__init__(meta=UnetMetaData())
         # check if hidden_dims is a list of hidden_dims
-        self.num_vars_profile = num_vars_profile
-        self.num_vars_scalar = num_vars_scalar
-        self.num_vars_profile_out = num_vars_profile_out
-        self.num_vars_scalar_out = num_vars_scalar_out
+        self.input_profile_num = input_profile_num
+        self.input_scalar_num = input_scalar_num
+        self.target_profile_num = target_profile_num
+        self.target_scalar_num = target_scalar_num
         self.model_channels = model_channels
 
-        self.in_channels = num_vars_profile + num_vars_scalar
-        self.out_channels = num_vars_profile_out + num_vars_scalar_out
+        self.in_channels = input_profile_num + input_scalar_num
+        self.out_channels = target_profile_num + target_scalar_num
         # print('1: out_channels', self.out_channels)
 
         # valid_encoder_types = ["standard", "skip", "residual"]
@@ -105,11 +104,10 @@ class ClimsimUnet(modulus.Module):
         self.encoder_type = encoder_type
         self.decoder_type = decoder_type
         self.resample_filter = resample_filter
-        self.n_model_levels = n_model_levels
-        self.input_padding = (seq_resolution-n_model_levels,0)
-        # self.qinput_prune=qinput_prune
+        self.vertical_level_num = vertical_level_num
+        self.input_padding = (seq_resolution-vertical_level_num,0)
         self.output_prune=output_prune
-        self.strato_lev=strato_lev
+        self.strato_lev_out=strato_lev_out
         self.loc_embedding = loc_embedding
         self.skip_conv = skip_conv
         self.prev_2d = prev_2d
@@ -133,7 +131,6 @@ class ClimsimUnet(modulus.Module):
             init_zero=init_zero,
             init_attn=init_attn,
         )
-
 
         # Encoder.
         self.enc = torch.nn.ModuleDict()
@@ -291,9 +288,9 @@ class ClimsimUnet(modulus.Module):
                        
     def forward(self, x):
         '''
-        x: (batch, num_vars_profile*levels+num_vars_scalar)
-        # x_profile: (batch, num_vars_profile, levels)
-        # x_scalar: (batch, num_vars_scalar)
+        x: (batch, input_profile_num*levels+input_scalar_num)
+        # x_profile: (batch, input_profile_num, levels)
+        # x_scalar: (batch, input_scalar_num)
         '''
 
         # if self.qinput_prune:
@@ -307,18 +304,18 @@ class ClimsimUnet(modulus.Module):
         #     x[:,-8:-3] = x[:,-8:-3].clone().zero_()
 
         # split x into x_profile and x_scalar
-        x_profile = x[:,:self.num_vars_profile*self.n_model_levels]
-        x_scalar = x[:,self.num_vars_profile*self.n_model_levels:]
+        x_profile = x[:,:self.input_profile_num*self.vertical_level_num]
+        x_scalar = x[:,self.input_profile_num*self.vertical_level_num:]
 
 
         # print(x_profile.shape, x_scalar.shape, x_loc.shape)
 
-        # reshape x_profile to (batch, num_vars_profile, levels)
-        x_profile = x_profile.reshape(-1, self.num_vars_profile, self.n_model_levels)
-        # broadcast x_scalar to (batch, num_vars_scalar, levels)
-        x_scalar = x_scalar.unsqueeze(2).expand(-1, -1, self.n_model_levels)
+        # reshape x_profile to (batch, input_profile_num, levels)
+        x_profile = x_profile.reshape(-1, self.input_profile_num, self.vertical_level_num)
+        # broadcast x_scalar to (batch, input_scalar_num, levels)
+        x_scalar = x_scalar.unsqueeze(2).expand(-1, -1, self.vertical_level_num)
 
-        #concatenate x_profile, x_scalar, x_loc to (batch, num_vars_profile+num_vars_scalar+8, levels)
+        #concatenate x_profile, x_scalar, x_loc to (batch, input_profile_num+input_scalar_num+8, levels)
         x = torch.cat((x_profile, x_scalar), dim=1)
         # print('2:', x.shape)
         # x = torch.cat((x_profile, x_scalar), dim=1)
@@ -397,44 +394,35 @@ class ClimsimUnet(modulus.Module):
             aux = tmp if aux is None else tmp + aux
 
         # here x should be (batch, output_channels, seq_resolution)
-        # remember that self.input_padding = (seq_resolution-n_model_levels,0)
+        # remember that self.input_padding = (seq_resolution-vertical_level_num,0)
         x = aux
         # print('7:', x.shape)
         #extracts the transformed x_profile and x_scalar from x
         if self.input_padding[1]==0:
-            y_profile = x[:,:self.num_vars_profile_out,self.input_padding[0]:]
-            y_scalar = x[:,self.num_vars_profile_out:,self.input_padding[0]:]
+            y_profile = x[:,:self.target_profile_num,self.input_padding[0]:]
+            y_scalar = x[:,self.target_profile_num:,self.input_padding[0]:]
         else:
-            y_profile = x[:,:self.num_vars_profile_out,self.input_padding[0]:-self.input_padding[1]]
-            y_scalar = x[:,self.num_vars_profile_out:,self.input_padding[0]:-self.input_padding[1]]
+            y_profile = x[:,:self.target_profile_num,self.input_padding[0]:-self.input_padding[1]]
+            y_scalar = x[:,self.target_profile_num:,self.input_padding[0]:-self.input_padding[1]]
 
         #take relu on y_scalar
         y_scalar = torch.nn.functional.relu(y_scalar)
-        #reshape y_profile to (batch, num_vars_profile_out*levels)
-        y_profile = y_profile.reshape(-1, self.num_vars_profile_out*self.n_model_levels)
+        #reshape y_profile to (batch, target_profile_num*levels)
+        y_profile = y_profile.reshape(-1, self.target_profile_num*self.vertical_level_num)
 
-        #average y_scalar for the lev dimension to (batch, num_vars_scalar_out)
+        #average y_scalar for the lev dimension to (batch, target_scalar_num)
         #take the average scalar over the levels
         y_scalar = y_scalar.mean(dim=2)
         # print('7.5:', y_profile.shape, y_scalar.shape)
 
-        #concatenate y_profile and y_scalar to (batch, num_vars_profile_out*levels+num_vars_scalar_out)
+        #concatenate y_profile and y_scalar to (batch, target_profile_num*levels+target_scalar_num)
         y = torch.cat((y_profile, y_scalar), dim=1)
 
         #prunes the stratosphere values
         if self.output_prune:
             y = y.clone()
-            y[:, 60:60+self.strato_lev] = y[:, 60:60+self.strato_lev].clone().zero_()
-            y[:, 120:120+self.strato_lev] = y[:, 120:120+self.strato_lev].clone().zero_()
-            y[:, 180:180+self.strato_lev] = y[:, 180:180+self.strato_lev].clone().zero_()
-            y[:, 240:240+self.strato_lev] = y[:, 240:240+self.strato_lev].clone().zero_()
-            # y[:, 300:300+self.strato_lev] = y[:, 300:300+self.strato_lev].clone().zero_()
-
+            y[:, 60:60+self.strato_lev_out] = y[:, 60:60+self.strato_lev_out].clone().zero_()
+            y[:, 120:120+self.strato_lev_out] = y[:, 120:120+self.strato_lev_out].clone().zero_()
+            y[:, 180:180+self.strato_lev_out] = y[:, 180:180+self.strato_lev_out].clone().zero_()
+            y[:, 240:240+self.strato_lev_out] = y[:, 240:240+self.strato_lev_out].clone().zero_()
         return y
-    
-    def count_trainable_parameters(self):
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-    if __name__ == '__main__':
-        model = ClimsimUnet()
-        print(model.count_trainable_parameters())

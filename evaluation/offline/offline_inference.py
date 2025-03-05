@@ -107,6 +107,10 @@ for model_name in model_paths.keys():
         for i in tqdm(range(0, torch_input.shape[0], batch_size)):
             batch = torch_input[i : i + batch_size, :].to(device)
             model_batch_pred = model(batch) # inference on batch
+            model_batch_pred[:, 60:75] = 0
+            model_batch_pred[:, 120:135] = 0
+            model_batch_pred[:, 180:195] = 0
+            model_batch_pred[:, 240:255] = 0
             model_batch_pred_list.append(model_batch_pred.cpu().numpy() / out_scale)
     model_preds[model_name] = np.stack(model_batch_pred_list, axis = 0) # 0 axis corresponds to time
     np.save(preds_path + f'{model_name}_preds.npy', model_preds[model_name])

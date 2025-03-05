@@ -6,8 +6,6 @@ import torch.nn as nn
 from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
-from modulus.metrics.general.mse import mse
-from loss_energy import loss_energy
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
@@ -19,15 +17,14 @@ from modulus.launch.logging import (
 )
 from climsim_utils.data_utils import *
 
-from climsim_datapip_processed import climsim_dataset_processed
-from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
-from climsim_unet import ClimsimUnet
-import climsim_unet as climsim_unet
+from climsim_datasets import TrainingDataset, ValidationDataset
+from unet import UnetModel
+from wrap_model import WrappedModel
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
-import gc
+import os, gc
 import random
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
@@ -44,28 +41,21 @@ def main(cfg: DictConfig) -> float:
     DistributedManager.initialize()
     dist = DistributedManager()
 
-    grid_path = cfg.climsim_path+'/grid_info/ClimSim_low-res_grid-info.nc'
-    norm_path = cfg.climsim_path+'/preprocessing/normalizations/'
-    grid_info = xr.open_dataset(grid_path)
-    input_mean = xr.open_dataset(norm_path + cfg.input_mean)
-    input_max = xr.open_dataset(norm_path + cfg.input_max)
-    input_min = xr.open_dataset(norm_path + cfg.input_min)
-    output_scale = xr.open_dataset(norm_path + cfg.output_scale)
-    # qc_lbd = xr.open_dataset(norm_path + cfg.qc_lbd)
-    # qi_lbd = xr.open_dataset(norm_path + cfg.qi_lbd)
-
-    lbd_qc = np.loadtxt(norm_path + cfg.qc_lbd, delimiter=',')
-    lbd_qi = np.loadtxt(norm_path + cfg.qi_lbd, delimiter=',')
+    grid_info = xr.open_dataset(cfg.grid_info_path)
+    input_mean = xr.open_dataset(cfg.input_mean_path)
+    input_max = xr.open_dataset(cfg.input_max_path)
+    input_min = xr.open_dataset(cfg.input_min_path)
+    output_scale = xr.open_dataset(cfg.output_scale_path)
+    qn_lbd = np.loadtxt(cfg.qn_lbd_path, delimiter=',')
 
     data = data_utils(grid_info = grid_info, 
-                  input_mean = input_mean, 
-                  input_max = input_max, 
-                  input_min = input_min, 
-                  output_scale = output_scale,
-                  qinput_log=cfg.qinput_log)
+                      input_mean = input_mean, 
+                      input_max = input_max, 
+                      input_min = input_min, 
+                      output_scale = output_scale)
 
     # set variables to subset
-    if cfg.variable_subsets == 'v1': 
+    if cfg.variable_subsets == 'v1':
         data.set_to_v1_vars()
     elif cfg.variable_subsets == 'v1_dyn':
         data.set_to_v1_dyn_vars()
@@ -89,48 +79,24 @@ def main(cfg: DictConfig) -> float:
 
     input_sub, input_div, out_scale = data.save_norm(write=False)
 
-
-    # Create dataset instances
-    # check if cfg.data_path + cfg.train_input exist
-    # if os.path.exists(cfg.data_path + cfg.train_input):
-    #     train_input_path = cfg.data_path + cfg.train_input
-    #     train_target_path = cfg.data_path + cfg.train_target
-    # else:
-    #     #make train_input_path a list of all paths of cfg.data_path +'/*/'+cfg.train_input
-    #     train_input_path = [f for f in glob.glob(cfg.data_path +'/*/'+cfg.train_input)]
-    #     train_target_path = [f for f in glob.glob(cfg.data_path +'/*/'+cfg.train_target)]
-
-    # print(train_input_path)
-
-    val_input_path = cfg.val_input
-    val_target_path = cfg.val_target
-    if not os.path.exists(cfg.val_input):
-        raise ValueError('Validation input path does not exist')
-
-    #choose dataset class based on cfg.lazy_load
-    # if cfg.lazy_load:
-    #     if isinstance(train_input_path, list):
-    #         dataset_class = climsim_dataset_lazy_list
-    #     else:
-    #         dataset_class = climsim_dataset_lazy
-    # else:
-    #     dataset_class = climsim_dataset
-    
-    #train_dataset = dataset_class(train_input_path, train_target_path, input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, cfg.strato_lev, lbd_qc, lbd_qi)
-    val_dataset = climsim_dataset_processed(val_input_path, val_target_path, cfg.output_prune, cfg.strato_lev_out)
-
-    #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
-    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
-    val_loader = DataLoader(val_dataset, 
-                            batch_size=cfg.batch_size, 
-                            shuffle=False,
-                            sampler=val_sampler,
-                            num_workers=cfg.num_workers)
-    
-    train_dataset = climsim_dataset_processed_h5(cfg.data_path, cfg.output_prune, cfg.strato_lev_out)
+    train_dataset = TrainingDataset(parent_path = cfg.data_path,
+                                    input_sub = input_sub,
+                                    input_div = input_div,
+                                    out_scale = out_scale,
+                                    qinput_prune = cfg.qinput_prune,
+                                    output_prune = cfg.output_prune,
+                                    strato_lev = cfg.strato_lev,
+                                    qn_lbd = qn_lbd,
+                                    decouple_cloud = cfg.decouple_cloud,
+                                    aggressive_pruning = cfg.aggressive_pruning,
+                                    strato_lev_qc = cfg.strato_lev_qc,
+                                    strato_lev_qinput = cfg.strato_lev_qinput,
+                                    strato_lev_tinput = cfg.strato_lev_tinput,
+                                    strato_lev_out = cfg.strato_lev_out,
+                                    input_clip = cfg.input_clip,
+                                    input_clip_rhonly = cfg.input_clip_rhonly)
             
-    #this sampler will be used by our data loader to allow us to work with paraellel gpu tasks
-    train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
+    train_sampler = DistributedSampler(train_dataset, seed = cfg.seed) if dist.distributed else None
     
     train_loader = DataLoader(train_dataset, 
                                 batch_size=cfg.batch_size, 
@@ -139,6 +105,32 @@ def main(cfg: DictConfig) -> float:
                                 drop_last=True,
                                 pin_memory=torch.cuda.is_available(),
                                 num_workers=cfg.num_workers)
+
+    val_dataset = ValidationDataset(val_input_path = cfg.val_input_path,
+                                    val_target_path = cfg.val_target_path,
+                                    input_sub = input_sub,
+                                    input_div = input_div,
+                                    out_scale = out_scale,
+                                    qinput_prune = cfg.qinput_prune,
+                                    output_prune = cfg.output_prune,
+                                    strato_lev = cfg.strato_lev,
+                                    qn_lbd = qn_lbd,
+                                    decouple_cloud = cfg.decouple_cloud,
+                                    aggressive_pruning = cfg.aggressive_pruning,
+                                    strato_lev_qc = cfg.strato_lev_qc,
+                                    strato_lev_qinput = cfg.strato_lev_qinput,
+                                    strato_lev_tinput = cfg.strato_lev_tinput,
+                                    strato_lev_out = cfg.strato_lev_out,
+                                    input_clip = cfg.input_clip,
+                                    input_clip_rhonly = cfg.input_clip_rhonly)
+
+    #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
+    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
+    val_loader = DataLoader(val_dataset, 
+                            batch_size=cfg.batch_size, 
+                            shuffle=False,
+                            sampler=val_sampler,
+                            num_workers=cfg.num_workers)
     # Create dataloaders
     # train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True)
     #val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False)
@@ -157,32 +149,31 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    tmp_unet_model_channels = int(cfg.unet_model_channels)
-    tmp_unet_attn_resolutions = [i for i in cfg.unet_attn_resolutions]
-    tmp_unet_num_blocks = int(cfg.unet_num_blocks)
-    tmp_output_prune = cfg.output_prune
-    tmp_strato_lev = cfg.strato_lev_out
-    tmp_loc_embedding = cfg.loc_embedding
-    tmp_skip_conv = cfg.skip_conv
-    tmp_prev_2d = cfg.prev_2d
-    tmp_dropout = cfg.dropout
-
-    model = ClimsimUnet(
-        num_vars_profile = input_size//60,
-        num_vars_scalar = input_size%60,
-        num_vars_profile_out = output_size//60,
-        num_vars_scalar_out = output_size%60,
-        seq_resolution = 64,
-        model_channels = tmp_unet_model_channels,
-        channel_mult = [1, 2, 2, 2],
-        num_blocks = tmp_unet_num_blocks,
-        attn_resolutions = tmp_unet_attn_resolutions,
-        dropout = tmp_dropout,
-        output_prune=tmp_output_prune,
-        strato_lev=tmp_strato_lev,
-        loc_embedding=tmp_loc_embedding,
-        skip_conv=tmp_skip_conv,
-        prev_2d=tmp_prev_2d
+    model = UnetModel(
+        input_profile_num = data.input_profile_num,
+        input_scalar_num = data.input_scalar_num,
+        target_profile_num = data.target_profile_num,
+        target_scalar_num = data.target_scalar_num,
+        output_prune = cfg.output_prune,
+        strato_lev_out = cfg.strato_lev_out,
+        dropout = cfg.dropout,
+        loc_embedding = cfg.loc_embedding,
+        embedding_type = cfg.embedding_type,
+        num_blocks = cfg.num_blocks,
+        attn_resolutions = cfg.attn_resolutions,
+        model_channels = cfg.model_channels,
+        skip_conv = cfg.skip_conv,
+        prev_2d = cfg.prev_2d,
+        seq_resolution = cfg.seq_resolution,
+        label_dim = cfg.label_dim,
+        augment_dim = cfg.augment_dim,
+        channel_mult = cfg.channel_mult,
+        channel_mult_emb = cfg.channel_mult_emb,
+        label_dropout = cfg.label_dropout,
+        channel_mult_noise = cfg.channel_mult_noise,
+        encoder_type = cfg.encoder_type,
+        decoder_type = cfg.decoder_type,
+        resample_filter = cfg.resample_filter,
     ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -217,8 +208,10 @@ def main(cfg: DictConfig) -> float:
         torch.cuda.current_stream().wait_stream(ddps)
 
     # create optimizer
-    if cfg.optimizer == 'adam':
+    if cfg.optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    elif cfg.optimizer == 'AdamW':
+        optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
     else:
         raise ValueError('Optimizer not implemented')
     
@@ -233,50 +226,17 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Scheduler not implemented')
     
     # create loss function
-    if cfg.loss == 'mse':
-        loss_fn = mse
+    if cfg.loss == 'MSE':
+        loss_fn = nn.MSELoss()
         criterion = nn.MSELoss()
-    elif cfg.loss == 'mae':
+    elif cfg.loss == 'L1':
         loss_fn = nn.L1Loss()
         criterion = nn.L1Loss()
-    elif cfg.loss == 'huber':
-        loss_fn = nn.SmoothL1Loss()
-        criterion = nn.SmoothL1Loss()
+    elif cfg.loss == 'Huber':
+        loss_fn = nn.HuberLoss()
+        criterion = nn.HuberLoss()
     else:
         raise ValueError('Loss function not implemented')
-    
-    def loss_weighted(pred, target):
-        if cfg.variable_subsets in ['v1','v1_dyn']:
-            raise ValueError('Weighted loss not implemented for v1/v1_dyn')
-        # dt_weight = 1.0
-        # dq1_weight = 1.0
-        # dq2_weight = 1.0
-        # dq3_weight = 1.0
-        # du_weight = 1.0
-        # dv_weight = 1.0
-        # d2d_weight = 1.0
-
-        # pred should be of shape (batch_size, 368)
-        # target should be of shape (batch_size, 368)
-        # 0-60: dt, 60-120 dq1, 120-180 dq2, 180-240 dq3, 240-300 du, 300-360 dv, 360-368 d2d
-        #only do the calculation if any of the weights are not 1.0
-        if cfg.dt_weight == 1.0 and cfg.dq1_weight == 1.0 and cfg.dq2_weight == 1.0 and cfg.dq3_weight == 1.0 and cfg.du_weight == 1.0 and cfg.dv_weight == 1.0 and cfg.d2d_weight == 1.0:
-            return criterion(pred, target)
-        pred[:,0:60] = pred[:,0:60] * cfg.dt_weight
-        pred[:,60:120] = pred[:,60:120] * cfg.dq1_weight
-        pred[:,120:180] = pred[:,120:180] * cfg.dq2_weight
-        pred[:,180:240] = pred[:,180:240] * cfg.dq3_weight
-        pred[:,240:300] = pred[:,240:300] * cfg.du_weight
-        pred[:,300:360] = pred[:,300:360] * cfg.dv_weight
-        pred[:,360:368] = pred[:,360:368] * cfg.d2d_weight
-        target[:,0:60] = target[:,0:60] * cfg.dt_weight
-        target[:,60:120] = target[:,60:120] * cfg.dq1_weight
-        target[:,120:180] = target[:,120:180] * cfg.dq2_weight
-        target[:,180:240] = target[:,180:240] * cfg.dq3_weight
-        target[:,240:300] = target[:,240:300] * cfg.du_weight
-        target[:,300:360] = target[:,300:360] * cfg.dv_weight
-        target[:,360:368] = target[:,360:368] * cfg.d2d_weight
-        return criterion(pred, target)
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
@@ -318,10 +278,13 @@ def main(cfg: DictConfig) -> float:
     if dist.rank == 0:
         save_path = os.path.join(cfg.save_path, cfg.expname) #cfg.save_path + cfg.expname
         save_path_ckpt = os.path.join(save_path, 'ckpt')
+        save_path_wrapped = os.path.join(save_path, 'wrapped')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         if not os.path.exists(save_path_ckpt):
             os.makedirs(save_path_ckpt)
+        if not os.path.exists(save_path_wrapped):
+            os.makedirs(save_path_wrapped)
     
     if dist.world_size > 1:
         torch.distributed.barrier()
@@ -343,7 +306,7 @@ def main(cfg: DictConfig) -> float:
     )
     def training_step(model, data_input, target):
         output = model(data_input)
-        loss = loss_weighted(output, target)
+        loss = criterion(output, target)
         return loss
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
@@ -399,10 +362,10 @@ def main(cfg: DictConfig) -> float:
                 # if cfg.do_energy_loss:
                 #     ps_raw = data_input[:,1500]*input_div[1500]+input_sub[1500]
                 #     loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
-                #     loss_orig = loss_weighted(output, target)
+                #     loss_orig = criterion(output, target)
                 #     loss = loss_orig + loss_energy_train
                 # else:
-                #     loss = loss_weighted(output, target)
+                #     loss = criterion(output, target)
                 # loss.backward()
                 loss = training_step(model, data_input, target)
                 # max_grad = max(p.grad.abs().max() for p in model.parameters() if p.grad is not None)
@@ -423,10 +386,7 @@ def main(cfg: DictConfig) -> float:
                 # scheduler.step()
                 #launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy()})
                 #if dist.rank == 0:
-                if cfg.do_energy_loss:
-                    launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "loss_energy_train": loss_energy_train.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"], "loss_orig": loss_orig.detach().cpu().numpy()})
-                else:
-                    launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
+                launchlog.log_minibatch({"loss_train": loss.detach().cpu().numpy(), "lr": optimizer.param_groups[0]["lr"]})
                 # Update the progress bar description with the current loss
                 train_loop.set_description(f'Epoch {epoch+1}')
                 train_loop.set_postfix(loss=loss.item())
@@ -435,9 +395,6 @@ def main(cfg: DictConfig) -> float:
             
             # model.eval()
             val_loss = 0.0
-            if cfg.do_energy_loss:
-                val_energy_loss = 0.0
-                val_orig = 0.0
             num_samples_processed = 0
             val_loop = tqdm(val_loader, desc=f'Epoch {epoch+1}/1 [Validation]')
             current_step = 0
@@ -453,13 +410,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 output = eval_step_forward(model, data_input)
-                if cfg.do_energy_loss:
-                    ps_raw = data_input[:,1500]*input_div[1500]+input_sub[1500]
-                    loss_energy_train = loss_energy(output, target, ps_raw, hyai, hybi, out_scale_device)*cfg.energy_loss_weight
-                    loss_orig = loss_weighted(output, target)
-                    loss = loss_orig + loss_energy_train
-                else:
-                    loss = loss_weighted(output, target)
+                loss = criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
@@ -467,11 +418,6 @@ def main(cfg: DictConfig) -> float:
                 current_val_loss_avg = val_loss / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
-                if cfg.do_energy_loss:
-                    val_energy_loss += loss_energy_train.item() * data_input.size(0)
-                    val_orig += loss_orig.item() * data_input.size(0)
-                    current_val_loss_avg_energy = val_energy_loss / num_samples_processed
-                    current_val_loss_avg_orig = val_orig / num_samples_processed
                 del data_input, target, output
                     
             
@@ -483,10 +429,7 @@ def main(cfg: DictConfig) -> float:
                 current_val_loss_avg = current_val_loss_avg.item() / dist.world_size
 
             if dist.rank == 0:
-                if cfg.do_energy_loss:
-                    launchlog.log_epoch({"loss_valid": current_val_loss_avg, "loss_energy_valid": current_val_loss_avg_energy, "loss_orig_valid": current_val_loss_avg_orig})
-                else:
-                    launchlog.log_epoch({"loss_valid": current_val_loss_avg})
+                launchlog.log_epoch({"loss_valid": current_val_loss_avg})
 
                 current_metric = current_val_loss_avg
                 # Save the top checkpoints
@@ -532,24 +475,35 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        climsim_unet.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)
         scripted_model = scripted_model.eval()
         save_file_torch = os.path.join(save_path, 'model.pt')
         scripted_model.save(save_file_torch)
+        # wrap model
+        device = torch.device("cuda")
+        wrapped_model = WrappedModel(original_model = model_inf,
+                                     input_sub = input_sub,
+                                     input_div = input_div,
+                                     out_scale = out_scale,
+                                     qn_lbd = qn_lbd).to(device)
+        save_file_wrapped = os.path.join(save_path, 'wrapped_model.pt')
+        scripted_model_wrapped = torch.jit.script(wrapped_model)
+        scripted_model_wrapped = scripted_model_wrapped.eval()
+        scripted_model_wrapped.save(save_file_wrapped)
         # save input and output normalizations
         data.save_norm(save_path, True)
         logger.info("saved input/output normalizations and model to: " + save_path)
 
         mdlus_directory = os.path.join(save_path, 'ckpt')
+        wrapped_directory = os.path.join(save_path, 'wrapped')
         for filename in os.listdir(mdlus_directory):
             print(filename)
             if filename.endswith(".mdlus"):
                 full_path = os.path.join(mdlus_directory, filename)
                 print(full_path)
-                model = modulus.Module.from_checkpoint(full_path).to("cpu")
+                model = modulus.Module.from_checkpoint(full_path).to(device)
                 scripted_model = torch.jit.script(model)
                 scripted_model = scripted_model.eval()
 
@@ -558,7 +512,17 @@ def main(cfg: DictConfig) -> float:
                 scripted_model.save(save_path_torch)
                 print('save path for ckpt torchscript:', save_path_torch)
 
-
+                # wrap model
+                wrapped_model = WrappedModel(original_model = model,
+                                             input_sub = input_sub,
+                                             input_div = input_div,
+                                             out_scale = out_scale,
+                                             qn_lbd = qn_lbd).to(device)
+                save_path_wrapped = os.path.join(wrapped_directory, filename.replace('.mdlus', '_wrapped.pt'))
+                scripted_model_wrapped = torch.jit.script(wrapped_model)
+                scripted_model_wrapped = scripted_model_wrapped.eval()
+                scripted_model_wrapped.save(save_path_wrapped)
+                
         logger.info("Training complete!")
 
     return current_val_loss_avg
