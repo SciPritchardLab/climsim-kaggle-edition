@@ -6,8 +6,6 @@ import torch.nn as nn
 from tqdm import tqdm
 from dataclasses import dataclass
 import modulus
-from modulus.metrics.general.mse import mse
-
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
 from modulus.launch.logging import (
@@ -19,18 +17,15 @@ from modulus.launch.logging import (
 )
 from climsim_utils.data_utils import *
 
-from climsim_datapip_processed import climsim_dataset_processed
-from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
-
-from pure_resLSTM import pure_resLSTM_nn
-import pure_resLSTM as pure_resLSTM
+from climsim_datasets import TrainingDataset, ValidationDataset
+from pure_resLSTM import PureResLSTM
+from wrap_model import WrappedModel
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
-import gc
+import os, gc
 import random
-from soap import SOAP
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -84,49 +79,24 @@ def main(cfg: DictConfig) -> float:
 
     input_sub, input_div, out_scale = data.save_norm(write=False)
 
-
-    # Create dataset instances
-    # check if cfg.data_path + cfg.train_input exist
-    # if os.path.exists(cfg.data_path + cfg.train_input):
-    #     train_input_path = cfg.data_path + cfg.train_input
-    #     train_target_path = cfg.data_path + cfg.train_target
-    # else:
-    #     #make train_input_path a list of all paths of cfg.data_path +'/*/'+cfg.train_input
-    #     train_input_path = [f for f in glob.glob(cfg.data_path +'/*/'+cfg.train_input)]
-    #     train_target_path = [f for f in glob.glob(cfg.data_path +'/*/'+cfg.train_target)]
-
-    # print(train_input_path)
-
-    val_input_path = cfg.val_input
-    val_target_path = cfg.val_target
-    if not os.path.exists(cfg.val_input):
-        raise ValueError(f'Validation input path does not exist: {cfg.val_input}')
-    if not os.path.exists(cfg.val_target):
-        raise ValueError(f'Validation target path does not exist: {cfg.val_target}')
-
-    #choose dataset class based on cfg.lazy_load
-    # if cfg.lazy_load:
-    #     if isinstance(train_input_path, list):
-    #         dataset_class = climsim_dataset_lazy_list
-    #     else:
-    #         dataset_class = climsim_dataset_lazy
-    # else:
-    #     dataset_class = climsim_dataset
-    
-    #train_dataset = dataset_class(train_input_path, train_target_path, input_sub, input_div, out_scale, cfg.qinput_prune, cfg.output_prune, cfg.strato_lev, lbd_qc, lbd_qi)
-    val_dataset = climsim_dataset_processed(val_input_path, val_target_path, cfg.output_prune, cfg.strato_lev_out)
-
-    #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
-    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
-    val_loader = DataLoader(val_dataset, 
-                            batch_size=cfg.batch_size, 
-                            shuffle=False,
-                            sampler=val_sampler,
-                            num_workers=cfg.num_workers)
-    
-    train_dataset = climsim_dataset_processed_h5(cfg.data_path, cfg.output_prune, cfg.strato_lev_out)
+    train_dataset = TrainingDataset(parent_path = cfg.data_path,
+                                    input_sub = input_sub,
+                                    input_div = input_div,
+                                    out_scale = out_scale,
+                                    qinput_prune = cfg.qinput_prune,
+                                    output_prune = cfg.output_prune,
+                                    strato_lev = cfg.strato_lev,
+                                    qn_lbd = qn_lbd,
+                                    decouple_cloud = cfg.decouple_cloud,
+                                    aggressive_pruning = cfg.aggressive_pruning,
+                                    strato_lev_qc = cfg.strato_lev_qc,
+                                    strato_lev_qinput = cfg.strato_lev_qinput,
+                                    strato_lev_tinput = cfg.strato_lev_tinput,
+                                    strato_lev_out = cfg.strato_lev_out,
+                                    input_clip = cfg.input_clip,
+                                    input_clip_rhonly = cfg.input_clip_rhonly)
             
-    train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
+    train_sampler = DistributedSampler(train_dataset, seed = cfg.seed) if dist.distributed else None
     
     train_loader = DataLoader(train_dataset, 
                                 batch_size=cfg.batch_size, 
@@ -135,6 +105,32 @@ def main(cfg: DictConfig) -> float:
                                 drop_last=True,
                                 pin_memory=torch.cuda.is_available(),
                                 num_workers=cfg.num_workers)
+
+    val_dataset = ValidationDataset(val_input_path = cfg.val_input_path,
+                                    val_target_path = cfg.val_target_path,
+                                    input_sub = input_sub,
+                                    input_div = input_div,
+                                    out_scale = out_scale,
+                                    qinput_prune = cfg.qinput_prune,
+                                    output_prune = cfg.output_prune,
+                                    strato_lev = cfg.strato_lev,
+                                    qn_lbd = qn_lbd,
+                                    decouple_cloud = cfg.decouple_cloud,
+                                    aggressive_pruning = cfg.aggressive_pruning,
+                                    strato_lev_qc = cfg.strato_lev_qc,
+                                    strato_lev_qinput = cfg.strato_lev_qinput,
+                                    strato_lev_tinput = cfg.strato_lev_tinput,
+                                    strato_lev_out = cfg.strato_lev_out,
+                                    input_clip = cfg.input_clip,
+                                    input_clip_rhonly = cfg.input_clip_rhonly)
+
+    #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
+    val_sampler = DistributedSampler(val_dataset, shuffle=False) if dist.distributed else None
+    val_loader = DataLoader(val_dataset, 
+                            batch_size=cfg.batch_size, 
+                            shuffle=False,
+                            sampler=val_sampler,
+                            num_workers=cfg.num_workers)
     # Create dataloaders
     # train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True)
     #val_loader = DataLoader(val_dataset, batch_size=cfg.batch_size, shuffle=False)
@@ -153,15 +149,17 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    model = pure_resLSTM_nn(
-            input_profile_num = data.input_profile_num,
-            input_scalar_num = data.input_scalar_num,
-            target_profile_num = data.target_profile_num,
-            target_scalar_num = data.target_scalar_num,
-            num_lstm = cfg.num_lstm,
-            hidden_state = cfg.hidden_state,
-            output_prune = cfg.output_prune,
-            strato_lev_out = cfg.strato_lev_out,
+    model = PureResLSTM(
+                input_profile_num = data.input_profile_num,
+                input_scalar_num = data.input_scalar_num,
+                target_profile_num = data.target_profile_num,
+                target_scalar_num = data.target_scalar_num,
+                output_prune = cfg.output_prune,
+                strato_lev_out = cfg.strato_lev_out,
+                loc_embedding = cfg.loc_embedding,
+                embedding_type = cfg.embedding_type,
+                num_lstm = cfg.num_lstm,
+                hidden_state = cfg.hidden_state,
             ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -200,10 +198,6 @@ def main(cfg: DictConfig) -> float:
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
     elif cfg.optimizer == 'AdamW':
         optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'RAdam':
-        optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'SOAP':
-        optimizer = SOAP(model.parameters(), lr = cfg.learning_rate, betas=(.95, .95), weight_decay=.01, precondition_frequency=10)
     else:
         raise ValueError('Optimizer not implemented')
     

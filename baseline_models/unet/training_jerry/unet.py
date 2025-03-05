@@ -39,7 +39,6 @@ class UnetModel(modulus.Module):
             input_scalar_num: int = 17, # number of input scalar variables
             target_profile_num: int = 5, # number of target profile variables
             target_scalar_num: int = 8, # number of target scalar variables
-            vertical_level_num: int = 60, # number of vertical levels
             output_prune: bool = True,
             strato_lev_out: int = 12,
             dropout: float = 0.0,
@@ -68,6 +67,7 @@ class UnetModel(modulus.Module):
         self.input_scalar_num = input_scalar_num
         self.target_profile_num = target_profile_num
         self.target_scalar_num = target_scalar_num
+        self.vertical_level_num = 60
         self.model_channels = model_channels
 
         self.in_channels = input_profile_num + input_scalar_num

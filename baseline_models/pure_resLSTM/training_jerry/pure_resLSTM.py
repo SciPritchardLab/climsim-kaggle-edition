@@ -15,7 +15,7 @@ Contains the code for the resLSTM and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class pure_resLSTM_metadata(modulus.ModelMetaData):
+class PureResLSTMMetadata(modulus.ModelMetaData):
     name: str = "pure_resLSTM"
     # Optimization
     jit: bool = True
@@ -23,29 +23,36 @@ class pure_resLSTM_metadata(modulus.ModelMetaData):
     amp_cpu: bool = True
     amp_gpu: bool = True
 
-class pure_resLSTM_nn(modulus.Module):
+class PureResLSTM(modulus.Module):
     def __init__(
             self,
             input_profile_num: int = 9, # number of input profile
             input_scalar_num: int = 17, # number of input scalars
             target_profile_num: int = 5, # number of target profile
             target_scalar_num: int = 8, # number of target scalars
-            num_lstm: int = 10, # number of LSTM layers
-            hidden_state: int = 256, # number of hidden units in LSTM
             output_prune: bool = True, # whether or not we prune strato_lev_out levels
             strato_lev_out: int = 12, # number of levels to set to zero
+            loc_embedding = cfg.loc_embedding, # whether or not to use location embedding
+            embedding_type = cfg.embedding_type, # type of location embedding
+            num_lstm: int = 10, # number of LSTM layers
+            hidden_state: int = 256, # number of hidden units in LSTM
             ):
-        super().__init__(meta=pure_resLSTM_metadata())
+
+        super().__init__(meta=PureResLSTMMetadata())
         self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
         self.target_profile_num = target_profile_num
         self.target_scalar_num = target_scalar_num
+        self.output_prune = output_prune
+        self.strato_lev_out = strato_lev_out
+        self.loc_embedding = loc_embedding
+        self.embedding_type = embedding_type
+        self.num_lstm = num_lstm
+        self.hidden_state = hidden_state
+        self.vertical_level_num = 60
         self.inputs_dim = input_profile_num + input_scalar_num
         self.targets_dim = target_profile_num + target_scalar_num
         self.num_lstm = num_lstm
-        self.hidden_state = hidden_state
-        self.output_prune = output_prune
-        self.strato_lev_out = strato_lev_out
 
         residual_layers = nn.ModuleList()
         lstm_layers = nn.ModuleDict()
@@ -55,9 +62,9 @@ class pure_resLSTM_nn(modulus.Module):
                                             hidden_size=self.hidden_state, num_layers=1,
                                             bidirectional=True, batch_first=True)
             if i == 0:
-                residual_layers.append(nn.Sequential(nn.LayerNorm([60, self.hidden_state*2]),nn.GELU()))
+                residual_layers.append(nn.Sequential(nn.LayerNorm([self.vertical_level_num, self.hidden_state*2]),nn.GELU()))
             else:
-                residual_layers.append(nn.LayerNorm([60, self.hidden_state*2]),)
+                residual_layers.append(nn.LayerNorm([self.vertical_level_num, self.hidden_state*2]),)
 
         self.res_act = nn.GELU()
         self.lstm_stack = lstm_layers
@@ -85,8 +92,8 @@ class pure_resLSTM_nn(modulus.Module):
                     p.data.fill_(0)
                        
     def forward(self, x):
-        profile_part = x[:,:self.input_profile_num*60].reshape(-1,self.input_profile_num,60).transpose(1,2)
-        scalar_part = x[:,self.input_profile_num*60:].unsqueeze(1).repeat(1,60,1)
+        profile_part = x[:,:self.input_profile_num*self.vertical_level_num].reshape(-1,self.input_profile_num,self.vertical_level_num).transpose(1,2)
+        scalar_part = x[:,self.input_profile_num*self.vertical_level_num:].unsqueeze(1).repeat(1,self.vertical_level_num,1)
         inputs_seq = torch.cat([profile_part, scalar_part], dim = -1)
         outputs = inputs_seq  # b,60,self.inputs_dim
         last_outputs = outputs
