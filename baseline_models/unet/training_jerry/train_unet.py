@@ -25,6 +25,7 @@ from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import os, gc
+import random
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
