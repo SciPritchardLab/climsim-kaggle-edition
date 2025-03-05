@@ -1,46 +1,14 @@
-from climsim_utils.data_utils import *
-
 import torch
-import numpy as np
-import torch.optim as optim
 import torch.nn as nn
-import modulus
-
-from pao_model import pao_model_nn
-import pao_model as pao_model
-
-input_mean_file = 'input_mean_v2_rh_mc_pervar.nc'
-input_max_file = 'input_max_v2_rh_mc_pervar.nc'
-input_min_file = 'input_min_v2_rh_mc_pervar.nc'
-output_scale_file = 'output_scale_std_lowerthred_v2_rh_mc.nc'
-qn_lbd_file = 'qn_exp_lambda_large.txt'
-
-grid_path = '../../../grid_info/ClimSim_low-res_grid-info.nc'
-
-f_torch_model = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/model_path/model.mdlus'
-save_file_torch = os.path.join('/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/model_path/wrapped/', 'wrapped_model.pt')
-
-grid_info = xr.open_dataset(grid_path)
-input_mean = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_mean_file)
-input_max = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_max_file)
-input_min = xr.open_dataset('../../../preprocessing/normalizations/inputs/' + input_min_file)
-output_scale = xr.open_dataset('../../../preprocessing/normalizations/outputs/' + output_scale_file)
-qn_lbd = np.loadtxt('../../../preprocessing/normalizations/inputs/' + qn_lbd_file, delimiter = ',')
-
-data = data_utils(grid_info = grid_info, 
-                  input_mean = input_mean, 
-                  input_max = input_max, 
-                  input_min = input_min, 
-                  output_scale = output_scale,
-                  qinput_log=False,
-                  normalize=False)
-
-data.set_to_v2_rh_mc_vars()
-
-input_sub, input_div, out_scale = data.save_norm(write = False)
+import numpy as np
 
 class WrappedModel(nn.Module):
-    def __init__(self, original_model, input_sub, input_div, out_scale, qn_lbd):
+    def __init__(self,
+                 original_model,
+                 input_sub,
+                 input_div,
+                 out_scale,
+                 qn_lbd):
         super(WrappedModel, self).__init__()
         self.original_model = original_model
         self.input_sub = torch.tensor(input_sub, dtype=torch.float32, device = torch.device('cuda'))
@@ -88,7 +56,6 @@ class WrappedModel(nn.Module):
         
         #prune top 15 levels in qn input
         x[:,120:120+15] = 0
-        x[:,180:180+15] = 0
         #clip rh input
         x[:, 60:120] = torch.clamp(x[:, 60:120], 0, 1.2)
 
@@ -127,14 +94,3 @@ class WrappedModel(nn.Module):
         xout[:,120:180] = (qc_new - qc_before)/1200.
         xout[:,180:240] = (qi_new - qi_before)/1200.
         return xout
-
-device = torch.device("cuda")
-model_inf = modulus.Module.from_checkpoint(f_torch_model).to(device)
-wrapped_model = WrappedModel(model_inf, input_sub, input_div, out_scale, qn_lbd).to(device)
-WrappedModel.device = "cuda"
-device = torch.device("cuda")
-scripted_model = torch.jit.script(wrapped_model)
-scripted_model = scripted_model.eval()
-scripted_model.save(save_file_torch)
-
-print('finished')
