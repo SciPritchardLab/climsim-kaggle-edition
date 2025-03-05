@@ -154,7 +154,7 @@ class ClimsimUnetConf(modulus.Module):
                     in_channels=cin, out_channels=cout, kernel=3, **init
                 )
             else:
-                #every multilayer section ends with a downsample block
+                #every multilayer section starts with a downsample block
                 self.enc[f"{res}_down"] = UNetBlock_noatten(
                     in_channels=cout, out_channels=cout, down=True, **block_kwargs
                 )
@@ -183,7 +183,7 @@ class ClimsimUnetConf(modulus.Module):
                     )
                     caux = cout
 
-            #for all 4 layers for this block
+            #for all 2 layers for this block
             for idx in range(num_blocks):
                 cin = cout
                 cout = model_channels * mult
@@ -346,8 +346,9 @@ class ClimsimUnetConf(modulus.Module):
             else:
                 # x = block(x, emb) if isinstance(block, UNetBlock) else block(x)
                 x = block(x)
-                skips.append(x)
+                skips.append(x) #stores a version of the x output data to be used by the skip layer
 
+        #stores the data ouputted by the skip layer
         new_skips = []
         #for x_tmp, conv_tmp in zip(skips, self.skip_conv_layer):
         #     x_tmp = conv_tmp(x_tmp)
@@ -442,6 +443,7 @@ class ClimsimUnetConf(modulus.Module):
         #prunes the stratosphere values
         if self.output_prune:
             y_pred = y_pred.clone()
+            #we limit this for each step so that our model doesn't go crazy
             y_pred[:, 60:60+self.strato_lev] = y_pred[:, 60:60+self.strato_lev].clone().zero_()
             y_pred[:, 120:120+self.strato_lev] = y_pred[:, 120:120+self.strato_lev].clone().zero_()
             y_pred[:, 180:180+self.strato_lev] = y_pred[:, 180:180+self.strato_lev].clone().zero_()
@@ -452,7 +454,6 @@ class ClimsimUnetConf(modulus.Module):
             y_conf[:, 120:120+self.strato_lev] = y_conf[:, 120:120+self.strato_lev].clone().zero_()
             y_conf[:, 180:180+self.strato_lev] = y_conf[:, 180:180+self.strato_lev].clone().zero_()
             y_conf[:, 240:240+self.strato_lev] = y_conf[:, 240:240+self.strato_lev].clone().zero_()
-            # y[:, 300:300+self.strato_lev] = y[:, 300:300+self.strato_lev].clone().zero_()
 
         return y_pred, y_conf
     
