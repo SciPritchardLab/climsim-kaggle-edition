@@ -28,7 +28,15 @@ import os, gc
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
-
+    torch.set_float32_matmul_precision("high")
+    # For PyTorch
+    torch.manual_seed(cfg.seed)
+    # For CUDA if using GPU
+    torch.cuda.manual_seed(cfg.seed)
+    torch.cuda.manual_seed_all(cfg.seed)  # if using multi-GPU
+    # For other libraries
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
     DistributedManager.initialize()
     dist = DistributedManager()
 
@@ -87,7 +95,7 @@ def main(cfg: DictConfig) -> float:
                                     input_clip = cfg.input_clip,
                                     input_clip_rhonly = cfg.input_clip_rhonly)
             
-    train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
+    train_sampler = DistributedSampler(train_dataset, seed = cfg.seed) if dist.distributed else None
     
     train_loader = DataLoader(train_dataset, 
                                 batch_size=cfg.batch_size, 
