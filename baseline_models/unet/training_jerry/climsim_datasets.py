@@ -150,7 +150,6 @@ class TrainingDataset(Dataset):
         elif self.qinput_prune:
             # x[:,60:60+self.strato_lev] = 0
             x[120:120+self.strato_lev] = 0
-            x[180:180+self.strato_lev] = 0
 
         if self.strato_lev_tinput >0:
             x[0:self.strato_lev_tinput] = 0
@@ -273,7 +272,6 @@ class ValidationDataset(Dataset):
         elif self.qinput_prune:
             # x[:,60:60+self.strato_lev] = 0
             x[120:120+self.strato_lev] = 0
-            x[180:180+self.strato_lev] = 0
 
         if self.strato_lev_tinput >0:
             x[0:self.strato_lev_tinput] = 0
@@ -292,4 +290,3 @@ class ValidationDataset(Dataset):
             y[180:180+self.strato_lev_out] = 0
             y[240:240+self.strato_lev_out] = 0
         return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
-
