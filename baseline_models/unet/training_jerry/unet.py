@@ -67,7 +67,6 @@ class UnetModel(modulus.Module):
         self.input_scalar_num = input_scalar_num
         self.target_profile_num = target_profile_num
         self.target_scalar_num = target_scalar_num
-        self.vertical_level_num = 60
         self.model_channels = model_channels
 
         self.in_channels = input_profile_num + input_scalar_num
@@ -104,8 +103,8 @@ class UnetModel(modulus.Module):
         self.encoder_type = encoder_type
         self.decoder_type = decoder_type
         self.resample_filter = resample_filter
-        self.vertical_level_num = vertical_level_num
-        self.input_padding = (seq_resolution-vertical_level_num,0)
+        self.vertical_level_num = 60
+        self.input_padding = (seq_resolution-self.vertical_level_num,0)
         self.output_prune=output_prune
         self.strato_lev_out=strato_lev_out
         self.loc_embedding = loc_embedding
