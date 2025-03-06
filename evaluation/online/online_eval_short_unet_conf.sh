@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -A m4334
-#SBATCH -C cpu
+#SBATCH -C gpu
 #SBATCH -q debug
-#SBATCH -t 1:00:00
+#SBATCH -t 0:30:00
 #SBATCH -n 1
 #SBATCH -c 32
 #SBATCH --image=nvcr.io/nvidia/modulus/modulus:24.01
@@ -12,7 +12,7 @@
 
 shifter python online_eval_short.py \
         --mmf_path '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/mmf_runs/mmf_speedeval_gpu/run/mmf_speedeval_gpu.eam.h2.0003-01-*.nc' \
-        --nn_path '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online/unet_conf_debug_2/run/E3SM_ML_ne4_rerun.F2010-MMF1.eam.h0.0002-*.nc' \
+        --nn_path '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online/unet_conf_debug_3/run/unet_conf_debug_3.eam.h2.0003-01-*.nc' \
         --save_path '/pscratch/sd/k/kfrields/hugging/scoring/unet_conf_output' \
         --var 'T' \
         --max_day 20 \
