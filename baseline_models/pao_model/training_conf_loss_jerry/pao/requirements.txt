@@ -1,0 +1,12 @@
+pandas
+numpy
+polars
+scikit-learn
+matplotlib
+tqdm 
+kaggle
+transformers
+beartype
+ipywidgets
+accelerate
+webdataset

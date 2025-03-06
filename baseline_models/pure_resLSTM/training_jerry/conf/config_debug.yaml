@@ -108,5 +108,7 @@ wandb:
    entity: "cbrain"
 
 # model hyperparameters
+loc_embedding: False
+embedding_type: "positional"
 num_lstm: 10
 hidden_state: 256

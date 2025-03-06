@@ -32,8 +32,8 @@ class PureResLSTM(modulus.Module):
             target_scalar_num: int = 8, # number of target scalars
             output_prune: bool = True, # whether or not we prune strato_lev_out levels
             strato_lev_out: int = 12, # number of levels to set to zero
-            loc_embedding = cfg.loc_embedding, # whether or not to use location embedding
-            embedding_type = cfg.embedding_type, # type of location embedding
+            loc_embedding: bool = False, # whether or not to use location embedding
+            embedding_type: str = "positional", # type of location embedding
             num_lstm: int = 10, # number of LSTM layers
             hidden_state: int = 256, # number of hidden units in LSTM
             ):

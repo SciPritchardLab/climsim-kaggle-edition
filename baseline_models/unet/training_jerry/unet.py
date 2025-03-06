@@ -393,7 +393,7 @@ class UnetModel(modulus.Module):
             aux = tmp if aux is None else tmp + aux
 
         # here x should be (batch, output_channels, seq_resolution)
-        # remember that self.input_padding = (seq_resolution-vertical_level_num,0)
+        # remember that self.input_padding = (seq_resolution-self.vertical_level_num,0)
         x = aux
         # print('7:', x.shape)
         #extracts the transformed x_profile and x_scalar from x

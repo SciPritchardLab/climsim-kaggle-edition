@@ -71,8 +71,8 @@ input_clip_rhonly: True
 # training settings
 seed: 43
 restart_path: ''
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/pure_resLSTM/'
-expname: 'pure_resLSTM_seed_43'
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging/pao_model/'
+expname: 'pao_model_debug'
 num_workers: 32
 batch_size: 1024
 epochs: 24
@@ -104,11 +104,11 @@ scheduler_warmup:
 early_stop_step: -1
 logger: 'wandb'
 wandb:
-   project: "climsim3_ensembles"
+   project: "climsim3_debugging"
    entity: "cbrain"
 
 # model hyperparameters
 loc_embedding: False
 embedding_type: "positional"
-num_lstm: 10
-hidden_state: 256
+hidden_series_num: 160
+hidden_scalar_num: 160
