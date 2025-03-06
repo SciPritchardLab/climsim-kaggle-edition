@@ -52,16 +52,16 @@ val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_
 val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_target.npy'
 variable_subsets: 'v2_rh_mc'
 qinput_log: False
-restart_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pure_resLSTM_AdamW/model.mdlus'
+restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'pure_resLSTM_AdamW_restart_1'
+expname: 'pao_model_AdamW'
 
 output_prune: True
 strato_lev_out: 12
 batch_size: 1024
 epochs: 16
-learning_rate: 0.00001
+learning_rate: 0.0001
 optimizer: 'AdamW'
 loss: 'huber'
 
@@ -101,5 +101,5 @@ wandb:
 num_workers: 32
 
 # model hyperparameters
-num_lstm: 10
-hidden_state: 256
+hidden_series_num: 160
+hidden_scalar_num: 160

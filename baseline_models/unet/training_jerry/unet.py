@@ -39,7 +39,6 @@ class UnetModel(modulus.Module):
             input_scalar_num: int = 17, # number of input scalar variables
             target_profile_num: int = 5, # number of target profile variables
             target_scalar_num: int = 8, # number of target scalar variables
-            vertical_level_num: int = 60, # number of vertical levels
             output_prune: bool = True,
             strato_lev_out: int = 12,
             dropout: float = 0.0,
@@ -104,8 +103,8 @@ class UnetModel(modulus.Module):
         self.encoder_type = encoder_type
         self.decoder_type = decoder_type
         self.resample_filter = resample_filter
-        self.vertical_level_num = vertical_level_num
-        self.input_padding = (seq_resolution-vertical_level_num,0)
+        self.vertical_level_num = 60
+        self.input_padding = (seq_resolution-self.vertical_level_num,0)
         self.output_prune=output_prune
         self.strato_lev_out=strato_lev_out
         self.loc_embedding = loc_embedding
@@ -394,7 +393,7 @@ class UnetModel(modulus.Module):
             aux = tmp if aux is None else tmp + aux
 
         # here x should be (batch, output_channels, seq_resolution)
-        # remember that self.input_padding = (seq_resolution-vertical_level_num,0)
+        # remember that self.input_padding = (seq_resolution-self.vertical_level_num,0)
         x = aux
         # print('7:', x.shape)
         #extracts the transformed x_profile and x_scalar from x

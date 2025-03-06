@@ -1,0 +1,5 @@
+# Ignore specific folders
+slurm_archive
+
+# Ignore file types
+*.out

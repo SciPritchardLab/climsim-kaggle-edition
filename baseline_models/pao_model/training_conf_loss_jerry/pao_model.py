@@ -19,7 +19,7 @@ Contains the code for the Pao model and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class PaoModelMetadata(modulus.ModelMetaData):
+class pao_model_metadata(modulus.ModelMetaData):
     name: str = "pao_model"
     # Optimization
     jit: bool = True
@@ -27,7 +27,7 @@ class PaoModelMetadata(modulus.ModelMetaData):
     amp_cpu: bool = True
     amp_gpu: bool = True
 
-class PaoModel(modulus.Module):
+class pao_model_nn(modulus.Module):
     def __init__(self,
                  input_profile_num: int = 9, # number of input profile variables
                  input_scalar_num: int = 17, # number of input scalar variables
@@ -35,8 +35,6 @@ class PaoModel(modulus.Module):
                  target_scalar_num: int = 8, # number of target scalar variables
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
-                 loc_embedding: bool = False, # whether or not to use location embedding
-                 embedding_type: str = "positional", # type of location embedding
                  hidden_profile_num: int = 160, # number of hidden units in MLP for profile
                  hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                 ):

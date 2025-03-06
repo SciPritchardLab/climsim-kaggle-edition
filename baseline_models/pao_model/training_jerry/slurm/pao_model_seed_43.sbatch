@@ -10,8 +10,10 @@
 #SBATCH --image=nvcr.io/nvidia/modulus/modulus:24.01
 #SBATCH --mail-user=jerryL9@uci.edu
 #SBATCH --mail-type=ALL
+##SBATCH --output=out_%j.out
+##SBATCH --error=eo_%j.err
 
-cmd="python train_pure_resLSTM_h5loader.py --config-name=config_AdamW_restart_1"
+cmd="python train_pao_model.py --config-name=config_seed_43"
 
-cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pure_resLSTM/training_jerry
+cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pao_model/training_jerry
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"

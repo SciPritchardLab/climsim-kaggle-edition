@@ -19,18 +19,15 @@ from modulus.launch.logging import (
 )
 from climsim_utils.data_utils import *
 
-from climsim_datapip_processed import climsim_dataset_processed
-from climsim_datapip_processed_h5 import climsim_dataset_processed_h5
-
-from pure_resLSTM import pure_resLSTM_nn
-import pure_resLSTM as pure_resLSTM
+from climsim_datasets import TrainingDataset, ValidationDataset
+from pao_model import PaoModel
+from wrap_model import WrappedModel
 import hydra
 from torch.nn.parallel import DistributedDataParallel
 from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
-import gc
+import os, gc
 import random
-from soap import SOAP
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -153,13 +150,13 @@ def main(cfg: DictConfig) -> float:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
 
-    model = pure_resLSTM_nn(
-            input_profile_num = data.input_profile_num,
+    model = pao_model_nn(
+            input_series_num = data.input_series_num,
             input_scalar_num = data.input_scalar_num,
-            target_profile_num = data.target_profile_num,
+            target_series_num = data.target_series_num,
             target_scalar_num = data.target_scalar_num,
-            num_lstm = cfg.num_lstm,
-            hidden_state = cfg.hidden_state,
+            hidden_series_num = cfg.hidden_series_num,
+            hidden_scalar_num = cfg.hidden_scalar_num,
             output_prune = cfg.output_prune,
             strato_lev_out = cfg.strato_lev_out,
             ).to(dist.device)
@@ -200,10 +197,6 @@ def main(cfg: DictConfig) -> float:
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
     elif cfg.optimizer == 'AdamW':
         optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'RAdam':
-        optimizer = optim.RAdam(model.parameters(), lr=cfg.learning_rate)
-    elif cfg.optimizer == 'SOAP':
-        optimizer = SOAP(model.parameters(), lr = cfg.learning_rate, betas=(.95, .95), weight_decay=.01, precondition_frequency=10)
     else:
         raise ValueError('Optimizer not implemented')
     
@@ -218,15 +211,15 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Scheduler not implemented')
     
     # create loss function
-    if cfg.loss == 'mse':
-        loss_fn = mse
+    if cfg.loss == 'MSE':
+        loss_fn = nn.MSELoss()
         criterion = nn.MSELoss()
-    elif cfg.loss == 'mae':
+    elif cfg.loss == 'L1':
         loss_fn = nn.L1Loss()
         criterion = nn.L1Loss()
-    elif cfg.loss == 'huber':
-        loss_fn = nn.SmoothL1Loss()
-        criterion = nn.SmoothL1Loss()
+    elif cfg.loss == 'Huber':
+        loss_fn = nn.HuberLoss()
+        criterion = nn.HuberLoss()
     else:
         raise ValueError('Loss function not implemented')
     
@@ -468,7 +461,7 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        pure_resLSTM.device = "cpu"
+        pao_model.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)

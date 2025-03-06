@@ -52,17 +52,17 @@ val_input: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_
 val_target: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/val_target.npy'
 variable_subsets: 'v2_rh_mc'
 qinput_log: False
-restart_path: ''
+restart_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_Adam/model.mdlus'
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus' # only in unet
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
-expname: 'pure_resLSTM_RAdam_debug'
+expname: 'pao_model_Adam_restart_1'
 
 output_prune: True
 strato_lev_out: 12
 batch_size: 1024
-epochs: 16
-learning_rate: 0.0001
-optimizer: 'RAdam'
+epochs: 32
+learning_rate: 0.00001
+optimizer: 'Adam'
 loss: 'huber'
 
 save_top_ckpts: 15 
@@ -95,11 +95,11 @@ early_stop_step: -1
 
 logger: 'wandb'
 wandb:
-   project: "climsim3_debugging"
+   project: "climsim3_allhands"
    entity: "cbrain"
 
 num_workers: 32
 
 # model hyperparameters
-num_lstm: 10
-hidden_state: 256
+hidden_series_num: 160
+hidden_scalar_num: 160
