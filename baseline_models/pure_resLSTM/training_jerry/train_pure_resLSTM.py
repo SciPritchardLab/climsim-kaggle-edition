@@ -264,10 +264,13 @@ def main(cfg: DictConfig) -> float:
     if dist.rank == 0:
         save_path = os.path.join(cfg.save_path, cfg.expname) #cfg.save_path + cfg.expname
         save_path_ckpt = os.path.join(save_path, 'ckpt')
+        save_path_wrapped = os.path.join(save_path, 'wrapped')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         if not os.path.exists(save_path_ckpt):
             os.makedirs(save_path_ckpt)
+        if not os.path.exists(save_path_wrapped):
+            os.makedirs(save_path_wrapped)
     
     if dist.world_size > 1:
         torch.distributed.barrier()
@@ -462,24 +465,35 @@ def main(cfg: DictConfig) -> float:
         save_file = os.path.join(save_path, 'model.mdlus')
         model.save(save_file)
         # convert the model to torchscript
-        pure_resLSTM.device = "cpu"
         device = torch.device("cpu")
         model_inf = modulus.Module.from_checkpoint(save_file).to(device)
         scripted_model = torch.jit.script(model_inf)
         scripted_model = scripted_model.eval()
         save_file_torch = os.path.join(save_path, 'model.pt')
         scripted_model.save(save_file_torch)
+        # wrap model
+        device = torch.device("cuda")
+        wrapped_model = WrappedModel(original_model = model_inf,
+                                     input_sub = input_sub,
+                                     input_div = input_div,
+                                     out_scale = out_scale,
+                                     qn_lbd = qn_lbd).to(device)
+        save_file_wrapped = os.path.join(save_path, 'wrapped_model.pt')
+        scripted_model_wrapped = torch.jit.script(wrapped_model)
+        scripted_model_wrapped = scripted_model_wrapped.eval()
+        scripted_model_wrapped.save(save_file_wrapped)
         # save input and output normalizations
         data.save_norm(save_path, True)
         logger.info("saved input/output normalizations and model to: " + save_path)
 
         mdlus_directory = os.path.join(save_path, 'ckpt')
+        wrapped_directory = os.path.join(save_path, 'wrapped')
         for filename in os.listdir(mdlus_directory):
             print(filename)
             if filename.endswith(".mdlus"):
                 full_path = os.path.join(mdlus_directory, filename)
                 print(full_path)
-                model = modulus.Module.from_checkpoint(full_path).to("cpu")
+                model = modulus.Module.from_checkpoint(full_path).to(device)
                 scripted_model = torch.jit.script(model)
                 scripted_model = scripted_model.eval()
 
@@ -488,7 +502,17 @@ def main(cfg: DictConfig) -> float:
                 scripted_model.save(save_path_torch)
                 print('save path for ckpt torchscript:', save_path_torch)
 
-
+                # wrap model
+                wrapped_model = WrappedModel(original_model = model,
+                                             input_sub = input_sub,
+                                             input_div = input_div,
+                                             out_scale = out_scale,
+                                             qn_lbd = qn_lbd).to(device)
+                save_path_wrapped = os.path.join(wrapped_directory, filename.replace('.mdlus', '_wrapped.pt'))
+                scripted_model_wrapped = torch.jit.script(wrapped_model)
+                scripted_model_wrapped = scripted_model_wrapped.eval()
+                scripted_model_wrapped.save(save_path_wrapped)
+                
         logger.info("Training complete!")
 
     return current_val_loss_avg
