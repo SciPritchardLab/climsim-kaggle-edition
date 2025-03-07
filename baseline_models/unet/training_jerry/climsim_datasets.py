@@ -229,8 +229,8 @@ class ValidationDataset(Dataset):
         return len(self.val_input)
 
     def __getitem__(self, idx):
-        x = self.inputs[idx]
-        y = self.targets[idx]
+        x = self.val_input[idx]
+        y = self.val_target[idx]
         x[120:180] = 1 - np.exp(-x[120:180] * self.qn_lbd)
         # Avoid division by zero in input_div and set corresponding x to 0
         # input_div_nonzero = self.input_div != 0
