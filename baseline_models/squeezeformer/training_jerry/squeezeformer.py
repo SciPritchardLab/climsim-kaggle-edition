@@ -15,7 +15,7 @@ Contains the code for the squeezeformer
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class squeezeformer_metadata(modulus.ModelMetaData):
+class SqueezeformerMetaData(modulus.ModelMetaData):
     name: str = "squeezeformer"
     # Optimization
     jit: bool = True
@@ -23,16 +23,18 @@ class squeezeformer_metadata(modulus.ModelMetaData):
     amp_cpu: bool = True
     amp_gpu: bool = True
 
-class squeezeformer_nn(modulus.Module):
+class Squeezeformer(modulus.Module):
     def __init__(self,
-                 input_series_num: int = 9, # number of input series
-                 input_scalar_num: int = 17, # number of input scalars
-                 target_series_num: int = 5, # number of target series
-                 target_scalar_num: int = 8, # number of target scalars
+                 input_profile_num: int = 9, # number of input profile variables
+                 input_scalar_num: int = 17, # number of input scalar variables
+                 target_profile_num: int = 5, # number of target profile variables
+                 target_scalar_num: int = 8, # number of target scalar variables
                  output_prune: bool = True, # whether or not we prune strato_lev_out levels
                  strato_lev_out: int = 12, # number of levels to set to zero
+                 loc_embedding: bool = False, # whether or not to use location embedding
+                 embedding_type: str = "positional", # type of location embedding
                 ):
-        super().__init__(meta = pao_model_metadata())
+        super().__init__(meta = SqueezeformerMetaData())
         self.input_series_num = input_series_num
         self.input_scalar_num = input_scalar_num
         self.target_series_num = target_series_num

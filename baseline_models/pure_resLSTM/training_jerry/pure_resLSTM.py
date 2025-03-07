@@ -15,7 +15,7 @@ Contains the code for the resLSTM and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class PureResLSTMMetadata(modulus.ModelMetaData):
+class PureResLSTMMetaData(modulus.ModelMetaData):
     name: str = "pure_resLSTM"
     # Optimization
     jit: bool = True
@@ -38,7 +38,7 @@ class PureResLSTM(modulus.Module):
             hidden_state: int = 256, # number of hidden units in LSTM
             ):
 
-        super().__init__(meta=PureResLSTMMetadata())
+        super().__init__(meta=PureResLSTMMetaData())
         self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
         self.target_profile_num = target_profile_num
