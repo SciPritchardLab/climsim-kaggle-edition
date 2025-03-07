@@ -40,11 +40,12 @@ class PaoModel(modulus.Module):
                  hidden_profile_num: int = 160, # number of hidden units in MLP for profile
                  hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                 ):
-        super().__init__(meta = pao_model_metadata())
+        super().__init__(meta = PaoModelMetadata())
         self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
         self.target_profile_num = target_profile_num
         self.target_scalar_num = target_scalar_num
+        self.vertical_level_num = 60
         self.hidden_profile_num = hidden_profile_num
         self.hidden_scalar_num = hidden_scalar_num
         self.num_hidden_total = self.hidden_profile_num + self.hidden_scalar_num
@@ -52,9 +53,9 @@ class PaoModel(modulus.Module):
         self.strato_lev_out = strato_lev_out
         # 60 profile 1d cnn
         self.feature_scale_list = nn.ModuleList([
-            FeatureScale(60) for _ in range(self.input_profile_num)
+            FeatureScale(self.vertical_level_num) for _ in range(self.input_profile_num)
         ])
-        self.positional_encoding = nn.Embedding(60, self.hidden_profile_num)
+        self.positional_encoding = nn.Embedding(self.vertical_level_num, self.hidden_profile_num)
         self.input_linear = nn.Linear(self.input_profile_num, self.hidden_profile_num)  # current, diff
         self.other_feats_mlp = nn.Sequential(
             nn.Linear(self.input_scalar_num, self.hidden_scalar_num),
@@ -66,7 +67,7 @@ class PaoModel(modulus.Module):
             # nn.ReLU(),
             nn.GELU()
         )
-        self.other_feats_proj_list = nn.ModuleList([nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num) for _ in range(60)])
+        self.other_feats_proj_list = nn.ModuleList([nn.Linear(self.hidden_scalar_num, self.hidden_scalar_num) for _ in range(self.vertical_level_num)])
         # layer norm
         self.layer_norm_in = self.num_hidden_total
         self.profile_layer_norm = nn.LayerNorm(self.layer_norm_in)
@@ -92,7 +93,7 @@ class PaoModel(modulus.Module):
             nn.GELU(),
             nn.Linear(self.hidden_profile_num, self.target_profile_num)
         )
-        self.output_scalar_mlp_input_dim = self.num_hidden_total * 60 * 2
+        self.output_scalar_mlp_input_dim = self.num_hidden_total * self.vertical_level_num * 2
         self.scalar_layer_norm = nn.LayerNorm(self.output_scalar_mlp_input_dim)
         self.scalar_output_mlp = nn.Sequential(
             nn.Linear(self.output_scalar_mlp_input_dim, self.hidden_scalar_num),
@@ -107,24 +108,24 @@ class PaoModel(modulus.Module):
     def forward(self, x):
         # reshape input
         batch_size = x.size(0)
-        profile_part = x[:, :self.input_profile_num*60]
-        profile_inputs = profile_part.reshape(batch_size, self.input_profile_num, 60)
-        scalar_inputs = x[:, self.input_profile_num*60:]
-        dim60_x = []
+        profile_part = x[:, :self.input_profile_num*self.vertical_level_num]
+        profile_inputs = profile_part.reshape(batch_size, self.input_profile_num, self.vertical_level_num)
+        scalar_inputs = x[:, self.input_profile_num*self.vertical_level_num:]
+        dim_profile = []
         # scale_ix = 0
         for group_ix, feature_scale in enumerate(self.feature_scale_list):
-            origin_x = profile_inputs[:, group_ix, :] # (batch, 60)
-            x = feature_scale(origin_x)  # (batch, 60)
+            origin_x = profile_inputs[:, group_ix, :] # (batch, self.vertical_level_num)
+            x = feature_scale(origin_x)  # (batch, self.vertical_level_num)
             # scale_ix += 1
             x = x.unsqueeze(-1)  # (batch, 60, 1)
-            dim60_x.append(x)
+            dim_profile.append(x)
             # # diff feature
             # x_diff = origin_x[:, 1:] - origin_x[:, :-1]  # (batch, 59)
             # x_diff = torch.cat([origin_x.new_zeros(origin_x.size(0), 1), x_diff], dim=1)  # (batch, 60)
             # x_diff = self.feature_scale[scale_ix](x_diff)  # (batch, 60)
             # scale_ix += 1
             # x_diff = x_diff.unsqueeze(-1)  # (batch, 60, 1)
-            # dim60_x.append(x_diff)
+            # dim_profile.append(x_diff)
             # # diff diff feature
             # x_diff = origin_x[:, 1:] - origin_x[:, :-1]
             # x_diff_diff = x_diff[:, 1:] - x_diff[:, :-1]  # (batch, 58)
@@ -132,9 +133,9 @@ class PaoModel(modulus.Module):
             # x_diff_diff = self.feature_scale[scale_ix](x_diff_diff)  # (batch, 60)
             # scale_ix += 1
             # x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
-            # dim60_x.append(x_diff_diff)
+            # dim_profile.append(x_diff_diff)
 
-        x = torch.cat(dim60_x, dim=2)  # (batch, 60, self.input_profile_num)
+        x = torch.cat(dim_profile, dim=2)  # (batch, 60, self.input_profile_num)
         position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
         position = self.positional_encoding(position)  # (batch, 60, 128)
         x = self.input_linear(x)  # (batch, profile_len, 128)

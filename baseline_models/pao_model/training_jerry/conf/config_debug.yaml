@@ -110,5 +110,5 @@ wandb:
 # model hyperparameters
 loc_embedding: False
 embedding_type: "positional"
-hidden_series_num: 160
+hidden_profile_num: 160
 hidden_scalar_num: 160
