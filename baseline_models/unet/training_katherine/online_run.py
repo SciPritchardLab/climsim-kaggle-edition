@@ -33,7 +33,7 @@ os.environ["FTorch_ROOT"] = ftorch_path
 
 # RESTART
 runtype = 'branch' # startup, hybrid,  branch
-refdate = '0003-01-01'
+refdate = '0003-01-30'
 #refdate = '0002-12-30' # only works for branch (and hybrid?)
 reftod = '00000' # or 21600, 43200, 64800
 # clean        = True
@@ -122,7 +122,7 @@ if newcase :
    # setup branch/hybrid
    if runtype == 'branch':
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_TYPE   --val {runtype}') # 'branch' won't allow change model time steps
-      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/k/kfrields/shared_e3sm/restart_files/{refdate}-{reftod}')
+      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/k/kfrields/shared_e3sm/restart_files/Users/katiefrields/Desktop/shared_e3sm/restart_files/{refdate}-{reftod}')
       run_cmd(f'./xmlchange --file env_run.xml --id GET_REFCASE --val TRUE')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFCASE --val E3SM_ML_ne4_rerun.F2010-MMF1')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDATE --val {refdate}')
