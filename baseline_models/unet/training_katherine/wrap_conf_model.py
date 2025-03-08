@@ -17,8 +17,8 @@ lbd_qn_file = 'qn_exp_lambda_large.txt'
 
 grid_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
 
-f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/model.mdlus'
-save_file_torch = os.path.join('/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/', 'wrapped_model.pt')
+f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/model.mdlus'
+save_file_torch = os.path.join('/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/', 'wrapped_model.pt')
 
 norm_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/'
 input_mean_file = 'inputs/input_mean_v6_pervar.nc'

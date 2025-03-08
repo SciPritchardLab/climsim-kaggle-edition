@@ -12,7 +12,7 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'unet_adamW'
+case_prefix = 'unet_conf_debug_3'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
@@ -20,7 +20,7 @@ top_dir  = os.getenv('HOME')
 scratch_dir = os.getenv('SCRATCH')
 
 #case_dir = scratch_dir+'/hugging/E3SM-MMF_ne4/online_runs/climsim3_allhands'
-case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/online'
+case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online'
 #src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 src_dir = '/global/homes/k/kfrields/nvidia_codes/E3SM_nvlab'
 
@@ -72,7 +72,7 @@ if debug_mode: case_list.append('debug')
 case='.'.join(case_list)
 #---------------------------------------------------------------------------------------------------
 # MMF_NN_EMULATOR
-f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/wrapped_model.pt'
+f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/wrapped_model.pt'
 cb_spinup_step = 5
 f_cb_strato_water_constraint = '.true.'
 
