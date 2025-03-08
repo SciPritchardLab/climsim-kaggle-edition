@@ -4,10 +4,15 @@ import torch.optim as optim
 import torch.nn as nn
 from dataclasses import dataclass
 import modulus
-import nvtx
-from torch.nn.functional import silu
+from layers import (
+    Reshape1,
+    Conv1DBlockSqueezeformer,
+    TransformerEncoder,
+    HeadDense,
+    GLUMlp,
+    Reshape2,
+)
 from typing import List
-
 """
 Contains the code for the squeezeformer
 """
@@ -33,6 +38,8 @@ class Squeezeformer(modulus.Module):
                  strato_lev_out: int = 12, # number of levels to set to zero
                  loc_embedding: bool = False, # whether or not to use location embedding
                  embedding_type: str = "positional", # type of location embedding
+                 dim: int = 256, # dimension of the model
+                 head_dim: int = 1024, # dimension of the head
                 ):
         super().__init__(meta = SqueezeformerMetaData())
         self.input_series_num = input_series_num

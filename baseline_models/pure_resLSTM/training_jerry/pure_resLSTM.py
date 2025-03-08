@@ -4,8 +4,6 @@ import torch.optim as optim
 import torch.nn as nn
 from dataclasses import dataclass
 import modulus
-import nvtx
-from torch.nn.functional import silu
 from typing import List
 
 """

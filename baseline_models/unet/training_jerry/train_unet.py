@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import modulus
 from modulus.utils import StaticCaptureTraining, StaticCaptureEvaluateNoGrad
 from omegaconf import DictConfig
+from omegaconf import OmegaConf
 from modulus.launch.logging import (
     PythonLogger,
     LaunchLogger,
@@ -148,7 +149,9 @@ def main(cfg: DictConfig) -> float:
     # create model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #print('debug: output_size', output_size, output_size//60, output_size%60)
-
+    attn_resolutions = OmegaConf.to_container(cfg.attn_resolutions, resolve = True)
+    channel_mult = OmegaConf.to_container(cfg.channel_mult, resolve = True)
+    resample_filter = OmegaConf.to_container(cfg.resample_filter, resolve = True)
     model = UnetModel(
         input_profile_num = data.input_profile_num,
         input_scalar_num = data.input_scalar_num,
@@ -160,20 +163,20 @@ def main(cfg: DictConfig) -> float:
         loc_embedding = cfg.loc_embedding,
         embedding_type = cfg.embedding_type,
         num_blocks = cfg.num_blocks,
-        attn_resolutions = cfg.attn_resolutions,
+        attn_resolutions = attn_resolutions,
         model_channels = cfg.model_channels,
         skip_conv = cfg.skip_conv,
         prev_2d = cfg.prev_2d,
         seq_resolution = cfg.seq_resolution,
         label_dim = cfg.label_dim,
         augment_dim = cfg.augment_dim,
-        channel_mult = cfg.channel_mult,
+        channel_mult = channel_mult,
         channel_mult_emb = cfg.channel_mult_emb,
         label_dropout = cfg.label_dropout,
         channel_mult_noise = cfg.channel_mult_noise,
         encoder_type = cfg.encoder_type,
         decoder_type = cfg.decoder_type,
-        resample_filter = cfg.resample_filter,
+        resample_filter = resample_filter,
     ).to(dist.device)
 
     if len(cfg.restart_path) > 0:
@@ -484,10 +487,10 @@ def main(cfg: DictConfig) -> float:
         # wrap model
         device = torch.device("cuda")
         wrapped_model = WrappedModel(original_model = model_inf,
-                                     input_sub = input_sub,
-                                     input_div = input_div,
-                                     out_scale = out_scale,
-                                     qn_lbd = qn_lbd).to(device)
+                                     input_sub = torch.tensor(input_sub, dtype=torch.float32).to(device),
+                                     input_div = torch.tensor(input_div, dtype=torch.float32).to(device),
+                                     out_scale = torch.tensor(out_scale, dtype=torch.float32).to(device),
+                                     qn_lbd = torch.tensor(qn_lbd, dtype=torch.float32).to(device)).to(device)
         save_file_wrapped = os.path.join(save_path, 'wrapped_model.pt')
         scripted_model_wrapped = torch.jit.script(wrapped_model)
         scripted_model_wrapped = scripted_model_wrapped.eval()
@@ -503,21 +506,22 @@ def main(cfg: DictConfig) -> float:
             if filename.endswith(".mdlus"):
                 full_path = os.path.join(mdlus_directory, filename)
                 print(full_path)
-                model = modulus.Module.from_checkpoint(full_path).to(device)
-                scripted_model = torch.jit.script(model)
+                model_inf = modulus.Module.from_checkpoint(full_path).to(device)
+                scripted_model = torch.jit.script(model_inf)
                 scripted_model = scripted_model.eval()
 
                 # Save the TorchScript model
                 save_path_torch = os.path.join(mdlus_directory, filename.replace('.mdlus', '.pt'))
                 scripted_model.save(save_path_torch)
                 print('save path for ckpt torchscript:', save_path_torch)
-
+                
                 # wrap model
-                wrapped_model = WrappedModel(original_model = model,
-                                             input_sub = input_sub,
-                                             input_div = input_div,
-                                             out_scale = out_scale,
-                                             qn_lbd = qn_lbd).to(device)
+                device = torch.device("cuda")
+                wrapped_model = WrappedModel(original_model = model_inf,
+                                            input_sub = torch.tensor(input_sub, dtype=torch.float32).to(device),
+                                            input_div = torch.tensor(input_div, dtype=torch.float32).to(device),
+                                            out_scale = torch.tensor(out_scale, dtype=torch.float32).to(device),
+                                            qn_lbd = torch.tensor(qn_lbd, dtype=torch.float32).to(device)).to(device)
                 save_path_wrapped = os.path.join(wrapped_directory, filename.replace('.mdlus', '_wrapped.pt'))
                 scripted_model_wrapped = torch.jit.script(wrapped_model)
                 scripted_model_wrapped = scripted_model_wrapped.eval()

@@ -4,14 +4,11 @@ import torch.optim as optim
 import torch.nn as nn
 from dataclasses import dataclass
 import modulus
-import nvtx
 from layers import (
     FeatureScale,
     ResidualBlock,
 )
-from torch.nn.functional import silu
 from typing import List
-
 """
 Contains the code for the Pao model and its training.
 """
