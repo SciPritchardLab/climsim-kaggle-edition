@@ -33,7 +33,7 @@ os.environ["FTorch_ROOT"] = ftorch_path
 
 # RESTART
 runtype = 'branch' # startup, hybrid,  branch
-refdate = '0003-01-30'
+refdate = '0003-01-01'
 #refdate = '0002-12-30' # only works for branch (and hybrid?)
 reftod = '00000' # or 21600, 43200, 64800
 # clean        = True
