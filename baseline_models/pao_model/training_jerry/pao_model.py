@@ -4,14 +4,11 @@ import torch.optim as optim
 import torch.nn as nn
 from dataclasses import dataclass
 import modulus
-import nvtx
 from layers import (
     FeatureScale,
     ResidualBlock,
 )
-from torch.nn.functional import silu
 from typing import List
-
 """
 Contains the code for the Pao model and its training.
 """
@@ -19,7 +16,7 @@ Contains the code for the Pao model and its training.
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 @dataclass
-class PaoModelMetadata(modulus.ModelMetaData):
+class PaoModelMetaData(modulus.ModelMetaData):
     name: str = "pao_model"
     # Optimization
     jit: bool = True
@@ -40,7 +37,7 @@ class PaoModel(modulus.Module):
                  hidden_profile_num: int = 160, # number of hidden units in MLP for profile
                  hidden_scalar_num: int = 160, # number of hidden units in MLP for scalar
                 ):
-        super().__init__(meta = PaoModelMetadata())
+        super().__init__(meta = PaoModelMetaData())
         self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
         self.target_profile_num = target_profile_num
