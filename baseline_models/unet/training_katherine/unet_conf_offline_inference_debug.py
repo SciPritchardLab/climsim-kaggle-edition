@@ -10,7 +10,7 @@ input_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_m
 target_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/scoring_target.npy'
 preds_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/'
 
-output_save_path = '/pscratch/sd/k/kfrields/hugging/scoring/'
+output_save_path = '/pscratch/sd/k/kfrields/hugging/scoring/unet_conf_output'
 
 
 grid_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
