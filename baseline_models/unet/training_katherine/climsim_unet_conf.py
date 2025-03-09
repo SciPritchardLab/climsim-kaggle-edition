@@ -237,8 +237,11 @@ class ClimsimUnetConf(modulus.Module):
 
         # Decoder.
         self.dec = torch.nn.ModuleDict()
-        self.dec_aux_norm = torch.nn.ModuleDict()
-        self.dec_aux_conv = torch.nn.ModuleDict()
+        self.dec_aux_norm_pred = torch.nn.ModuleDict()
+        self.dec_aux_conv_pred = torch.nn.ModuleDict()
+
+        self.dec_aux_norm_conf = torch.nn.ModuleDict()
+        self.dec_aux_conv_conf = torch.nn.ModuleDict()
         for level, mult in reversed(list(enumerate(channel_mult))):
             #decreases the resolution for each level (starts high since order of layers is inverted, we start w outer layer)
             res = seq_resolution >> level
@@ -278,12 +281,18 @@ class ClimsimUnetConf(modulus.Module):
                 #         up=True,
                 #         resample_filter=resample_filter,
                 #     )
-                self.dec_aux_norm[f"{res}_aux_norm"] = GroupNorm(
+                self.dec_aux_norm_pred[f"{res}_aux_norm"] = GroupNorm(
+                    num_channels=cout, eps=1e-6
+                )
+                self.dec_aux_norm_conf[f"{res}_aux_norm"] = GroupNorm(
                     num_channels=cout, eps=1e-6
                 )
                 ## comment out the last conv layer that supposed to recover the output channels
                 ## we will manually recover the output channels
-                self.dec_aux_conv[f"{res}_aux_conv"] = Conv1d(
+                self.dec_aux_conv_pred[f"{res}_aux_conv"] = Conv1d(
+                    in_channels=cout, out_channels=self.out_channels, kernel=3, **init_zero
+                )
+                self.dec_aux_conv_conf[f"{res}_aux_conv"] = Conv1d(
                     in_channels=cout, out_channels=self.out_channels, kernel=3, **init_zero
                 )
 
@@ -392,16 +401,19 @@ class ClimsimUnetConf(modulus.Module):
             #         tmp = block(x)
 
         #runs our data through the normalization and convolutional layers at the very end
-        for name, block in self.dec_aux_norm.items():
+        for name, block in self.dec_aux_norm_pred.items():
             pred_tmp = block(x)
+
+        for name, block in self.dec_aux_norm_conf.items():
             conf_tmp = block(x)
 
         #since we are running a standard decoder, there are no aux blocks so aux is None
-        for name, block in self.dec_aux_conv.items():
+        for name, block in self.dec_aux_conv_pred.items():
             pred_tmp = block(silu(pred_tmp))
-            conf_tmp = block(silu(conf_tmp))
-
             pred_aux = pred_tmp if pred_aux is None else pred_tmp + pred_aux
+
+        for name, block in self.dec_aux_conv_conf.items():
+            conf_tmp = block(silu(conf_tmp))
             conf_aux = conf_tmp if conf_aux is None else conf_tmp + conf_aux
 
         # here x should be (batch, output_channels, seq_resolution)
