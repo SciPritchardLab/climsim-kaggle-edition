@@ -18,11 +18,11 @@ norm_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizat
 
 unet_adamW_model_path = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/model.pt'
 
-model_paths = {'unet_adamW': unet_adamW_model_path}
+model_paths = {'unet_adamW_conf': unet_adamW_model_path}
 
-model_colors = {'unet_adamW': 'red'}
+model_colors = {'unet_adamW_conf': 'red'}
 
-model_labels = {'unet_adamW': 'unet_adamW'}
+model_labels = {'unet_adamW_conf': 'unet_adamW_conf'}
 
 num_models = len(model_paths)
 model_preds = {}
