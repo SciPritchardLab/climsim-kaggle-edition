@@ -1,5 +1,4 @@
 # Ignore specific folders
-slurm_archive
-
-# Ignore file types
-*.out
+wandb/
+__pycache__/
+outputs/
