@@ -107,9 +107,9 @@ class PureResLSTM(modulus.Module):
 
         outputs = self.fc(outputs)  # b,60,self.targets_dim
 
-        profile_part = outputs[:,:,self.target_scalar_num:]
-        profile_part = profile_part.permute(0,2,1).reshape(-1,300) # b,300
-        scalar_part = outputs[:,:,:self.target_scalar_num]
+        profile_part = outputs[:,:,:self.target_profile_num * self.vertical_level_num]
+        profile_part = profile_part.permute(0,2,1).reshape(-1,self.target_profile_num * self.vertical_level_num) # b,300
+        scalar_part = outputs[:,:,self.target_profile_num * self.vertical_level_num:]
         scalar_part = torch.mean(scalar_part, dim=1) # b,8
 
         y = torch.concat([profile_part, scalar_part], dim=1)
