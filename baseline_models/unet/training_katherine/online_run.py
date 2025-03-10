@@ -12,7 +12,7 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'unet_adamW'
+case_prefix = 'unet_adamW_debug_long'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
