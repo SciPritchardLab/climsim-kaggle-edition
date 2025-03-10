@@ -76,18 +76,18 @@ from torch import Tensor
 class GLU(nn.Module):
     def __init__(self):
         super(GLU, self).__init__()
-
+        self.activation = nn.SiLU()  # Equivalent to 'swish' in TensorFlow/Keras
     def forward(self, x):
         x, gate = torch.chunk(x, 2, dim=-1)
-        x = x * F.silu(gate)
+        x = x * self.activation(gate)
         return x
     
 class GLUMlp(nn.Module):
-    def __init__(self, dim_expand, dim):
+    def __init__(self, expand_dim, head_dim):
         super(GLUMlp, self).__init__()
-        self.dense_1 = nn.Linear(dim, dim_expand)
+        self.dense_1 = nn.Linear(head_dim, expand_dim)
         self.glu_1 = GLU()
-        self.dense_2 = nn.Linear(dim_expand // 2, dim)
+        self.dense_2 = nn.Linear(expand_dim // 2, head_dim)
 
     def forward(self, x):
         x = self.dense_1(x)
@@ -105,10 +105,10 @@ class ScaleBias(nn.Module):
         return x * self.scale + self.bias
     
 class TransformerEncoder(nn.Module):
-    def __init__(self, embed_dim, num_heads, feed_forward_dim):
+    def __init__(self, embed_dim, num_heads, expand_dim):
         super(TransformerEncoder, self).__init__()
         self.att = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
-        self.ffn = GLUMlp(feed_forward_dim, embed_dim)
+        self.ffn = GLUMlp(expand_dim, embed_dim)
         self.layer_norm_1 = nn.LayerNorm(embed_dim, eps=1e-6)
         self.layer_norm_2 = nn.LayerNorm(embed_dim, eps=1e-6)
         self.scale_bias_1 = ScaleBias(embed_dim)
@@ -166,27 +166,35 @@ class HeadDense(nn.Module):
 
 class Conv1DBlockSqueezeformer(nn.Module):
     def __init__(self, channel_size, kernel_size, dilation_rate=1,
-                 expand_ratio=4, se_ratio=0.25, activation='swish'):
+                 expand_ratio=4, activation='SiLU'):
         super(Conv1DBlockSqueezeformer, self).__init__()
         self.channel_size = channel_size
         self.kernel_size = kernel_size
         self.dilation_rate = dilation_rate
         self.expand_ratio = expand_ratio
-        self.se_ratio = se_ratio
         self.activation = activation
         self.scale_bias = ScaleBias(channel_size)
         self.glu_layer = GLU()
-        self.ffn = GLUMlp(channel_size * 4, channel_size)
+        self.ffn = GLUMlp(self.channel_size * self.expand_ratio, self.channel_size)
         self.layer_norm_2 = nn.LayerNorm(channel_size, eps=1e-6)
         self.scale_bias_1 = ScaleBias(channel_size)
         self.scale_bias_2 = ScaleBias(channel_size)
-
-        self.dwconv = nn.Conv1d(channel_size*2, channel_size*2, kernel_size=kernel_size, stride=1, padding=kernel_size//2, dilation=dilation_rate, groups=channel_size, bias=False)
-        self.batch_norm = nn.BatchNorm1d(channel_size*2, momentum=0.95)
-        self.conv_activation = nn.SiLU() if activation == 'swish' else nn.ReLU()
+        self.channel_size_dwconv = channel_size * expand_ratio // 2
+        self.dwconv = nn.Conv1d(
+            in_channels = self.channel_size_dwconv,
+            out_channels = self.channel_size_dwconv,
+            kernel_size = kernel_size,
+            stride = 1,
+            padding = 'same',
+            dilation = dilation_rate,
+            groups = self.channel_size_dwconv,
+            bias=False
+        )
+        self.batch_norm = nn.BatchNorm1d(self.channel_size_dwconv, momentum=0.95)
+        self.conv_activation = nn.SiLU() if activation == 'SiLU' or activation == 'swish' else nn.ReLU()
         self.eca_layer = ECA()
         self.expand = nn.Linear(channel_size, channel_size * expand_ratio)
-        self.project = nn.Linear(channel_size * expand_ratio // 2, channel_size)
+        self.project = nn.Linear(self.channel_size_dwconv, channel_size)
 
     def forward(self, x):
         skip = x
@@ -208,50 +216,50 @@ class Conv1DBlockSqueezeformer(nn.Module):
         x = self.layer_norm_2(x + residual)
         return x
     
-class Reshape1(nn.Module):
-    def __init__(self, col_len):
-        super(Reshape1, self).__init__()
-        self.col_len = col_len
+# class Reshape1(nn.Module):
+#     def __init__(self, col_len):
+#         super(Reshape1, self).__init__()
+#         self.col_len = col_len
 
-    def forward(self, x):
-        # First part of x
-        x_seq = x[:, :self.col_len]
-        x_seq = x_seq.view(-1, int(self.col_len / 60), 60).contiguous()
-        x_seq = x_seq.permute(0, 2, 1)
+#     def forward(self, x):
+#         # First part of x
+#         x_seq = x[:, :self.col_len]
+#         x_seq = x_seq.view(-1, int(self.col_len / 60), 60).contiguous()
+#         x_seq = x_seq.permute(0, 2, 1)
         
-        # Second part of x
-        x_seq_N = x[:, self.col_len:]
-        x_seq_N = x_seq_N.unsqueeze(1).repeat(1, 60, 1)
+#         # Second part of x
+#         x_seq_N = x[:, self.col_len:]
+#         x_seq_N = x_seq_N.unsqueeze(1).repeat(1, 60, 1)
         
-        # Concatenate along the last dimension
-        x = torch.cat([x_seq, x_seq_N], dim=-1)
-        return x
+#         # Concatenate along the last dimension
+#         x = torch.cat([x_seq, x_seq_N], dim=-1)
+#         return x
     
-class Reshape2(nn.Module):
-    def __init__(self):
-        super(Reshape2, self).__init__()
+# class Reshape2(nn.Module):
+#     def __init__(self):
+#         super(Reshape2, self).__init__()
 
-    def forward(self, x_pred, x_confidence):
-        x = x_pred
+#     def forward(self, x_pred, x_confidence):
+#         x = x_pred
         
-        # Process x_pred
-        x_seq = x[:, :, :5]
-        x_seq = x_seq.permute(0, 2, 1).contiguous()
-        x_seq = x_seq.reshape(-1, 60 * 5)
-        x_seq_N = x[:, :, 5:]
-        x_seq_N = x_seq_N.mean(dim=1)
-        x1 = torch.cat([x_seq, x_seq_N], dim=-1)
+#         # Process x_pred
+#         x_seq = x[:, :, :5]
+#         x_seq = x_seq.permute(0, 2, 1).contiguous()
+#         x_seq = x_seq.reshape(-1, 60 * 5)
+#         x_seq_N = x[:, :, 5:]
+#         x_seq_N = x_seq_N.mean(dim=1)
+#         x1 = torch.cat([x_seq, x_seq_N], dim=-1)
 
-        x = x_confidence
+#         x = x_confidence
         
-        # Process x_confidence
-        x_seq = x[:, :, :5]
-        x_seq = x_seq.permute(0, 2, 1).contiguous()
-        x_seq = x_seq.reshape(-1, 60 * 5)
-        x_seq_N = x[:, :, 5:]
-        x_seq_N = x_seq_N.mean(dim=1)
-        x2 = torch.cat([x_seq, x_seq_N], dim=-1)
+#         # Process x_confidence
+#         x_seq = x[:, :, :5]
+#         x_seq = x_seq.permute(0, 2, 1).contiguous()
+#         x_seq = x_seq.reshape(-1, 60 * 5)
+#         x_seq_N = x[:, :, 5:]
+#         x_seq_N = x_seq_N.mean(dim=1)
+#         x2 = torch.cat([x_seq, x_seq_N], dim=-1)
 
-        x = torch.cat([x1, x2], dim=-1)
-        return x
-        # return x1
+#         x = torch.cat([x1, x2], dim=-1)
+#         return x
+#         # return x1
