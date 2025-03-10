@@ -5,12 +5,10 @@ import torch.nn as nn
 from dataclasses import dataclass
 import modulus
 from layers import (
-    Reshape1,
     Conv1DBlockSqueezeformer,
     TransformerEncoder,
     HeadDense,
     GLUMlp,
-    Reshape2,
 )
 from typing import List
 """
