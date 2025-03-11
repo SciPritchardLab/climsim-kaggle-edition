@@ -12,7 +12,7 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'unet_conf_1_year_debug'
+case_prefix = 'unet_conf_debug_4'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
@@ -20,7 +20,7 @@ top_dir  = os.getenv('HOME')
 scratch_dir = os.getenv('SCRATCH')
 
 #case_dir = scratch_dir+'/hugging/E3SM-MMF_ne4/online_runs/climsim3_allhands'
-case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf_2/online'
+case_dir = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online'
 #src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 src_dir = '/global/homes/k/kfrields/nvidia_codes/E3SM_nvlab'
 
@@ -49,7 +49,7 @@ debug_mode = False
 dtime = 1200 # set to 0 to use a default value 
 
 #stop_opt,stop_n,resub,walltime = 'nmonths',1, 1, '00:30:00'
-stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'00:10:00'
+stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'00:30:00'
 #stop_opt,stop_n,resub,walltime = 'ndays',10, 0,'00:30:00'
 
 ne,npg=4,2;  num_nodes=2  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
@@ -72,7 +72,7 @@ if debug_mode: case_list.append('debug')
 case='.'.join(case_list)
 #---------------------------------------------------------------------------------------------------
 # MMF_NN_EMULATOR
-f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf_2/wrapped_model.pt'
+f_torch_model = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/wrapped_model.pt'
 cb_spinup_step = 5
 f_cb_strato_water_constraint = '.true.'
 
@@ -122,7 +122,7 @@ if newcase :
    # setup branch/hybrid
    if runtype == 'branch':
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_TYPE   --val {runtype}') # 'branch' won't allow change model time steps
-      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/k/kfrields/shared_e3sm/restart_files/Users/katiefrields/Desktop/shared_e3sm/restart_files/{refdate}-{reftod}')
+      run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDIR  --val /global/homes/k/kfrields/shared_e3sm/restart_files/{refdate}-{reftod}')
       run_cmd(f'./xmlchange --file env_run.xml --id GET_REFCASE --val TRUE')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFCASE --val E3SM_ML_ne4_rerun.F2010-MMF1')
       run_cmd(f'./xmlchange --file env_run.xml --id RUN_REFDATE --val {refdate}')
@@ -146,7 +146,7 @@ do_aerosol_rad = .false.
 
 &mmf_nn_emulator_nl
 inputlength     = 557
-outputlength    = 368
+outputlength    = 736
 cb_nn_var_combo = 'v2'
 input_rh        = .true.
 cb_torch_model  = '{f_torch_model}'
@@ -167,7 +167,7 @@ fincl1 = 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS', 'CLDICE', 'CLDLIQ'
 fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
 fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
 avgflag_pertape = 'A','A','I'
-nhtfrq = 0,0,0
+nhtfrq = 0,-24,-1
 mfilt  = 0,1,1
 /
 
