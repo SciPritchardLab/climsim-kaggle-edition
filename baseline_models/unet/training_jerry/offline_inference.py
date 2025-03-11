@@ -7,23 +7,23 @@ from tqdm import tqdm
 
 input_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/scoring_set/scoring_input.npy'
 target_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/scoring_set/scoring_target.npy'
-preds_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/scoring_set/preds/'
+preds_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/evaluation_figures/unet/unet_seed_43/offline/'
 
-unet_path = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/model.pt'
-pure_resLSTM_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pure_resLSTM_AdamW/model.pt'
-pao_model_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/pao_model_AdamW_restart_1/model.pt'
+unet_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/unet_seed_43/model.pt'
+unet_epoch_08_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/unet_seed_43/ckpt/ckpt_epoch_8_metric_0.0722.pt'
+unet_epoch_10_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/unet_seed_43/ckpt/ckpt_epoch_10_metric_0.0722.pt'
 
 model_paths = {'unet': unet_path, \
-               'pure_resLSTM': pure_resLSTM_path, \
-               'pao_model': pao_model_path}
+               'unet_epoch_08': unet_epoch_08_path, \
+               'unet_epoch_10': unet_epoch_10_path}
 
 model_colors = {'unet': 'green', \
-                'pure_resLSTM': 'blue', \
-                'pao_model': 'red'}
+                'unet_epoch_08': 'blue', \
+                'unet_epoch_10': 'red'}
 
 model_labels = {'unet': 'UNet', \
-                'pure_resLSTM': 'pure resLSTM', \
-                'pao_model': 'Pao Model'}
+                'unet_epoch_08': 'Unet epoch 8', \
+                'unet_epoch_10': 'Unet epoch 10'}
 
 num_models = len(model_paths)
 model_preds = {}

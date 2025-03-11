@@ -73,21 +73,21 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     elif var == 'Q':
         var_name = 'Moisture'
         units = 'g/kg'
-        cmap = 'Blues'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        cmap = 'managua'
+        vmin = -.008
+        vmax = .008
     elif var == 'CLDLIQ':
         var_name = 'Liquid Cloud'
         units = 'mg/kg'
-        cmap = 'bone'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        cmap = 'managua'
+        vmin = -1e-4 # placeholder
+        vmax = 1e-4 # placeholder
     elif var == 'CLDICE':
         var_name = 'Ice Cloud'
         units = 'mg/kg'
-        cmap = 'bone'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        cmap = 'managua'
+        vmin = -1e-4 # placeholder
+        vmax = 1e-4 # placeholder
 
     arr_nn = ds_nn[var].values
     arr_sp = ds_sp[var].values
@@ -139,7 +139,7 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     ax.set_ylabel('Hybrid Pressure (hPa)',fontsize=14)
     ax.tick_params(axis='both', which='major', labelsize=12)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'first_month_zonal_mean_bias.png'))
+    plt.savefig(os.path.join(save_path, f'first_month_zonal_mean_bias_{var}.png'))
     plt.clf()
 
     movie_path = os.path.join(save_path, 'movies')

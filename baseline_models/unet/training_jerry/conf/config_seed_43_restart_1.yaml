@@ -72,7 +72,7 @@ input_clip_rhonly: True
 seed: 43
 restart_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/unet_seed_43/ckpt/ckpt_epoch_8_metric_0.0722.mdlus'
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/'
-expname: 'unet_seed_43'
+expname: 'unet_seed_43_restart_1'
 num_workers: 32
 batch_size: 1024
 epochs: 24
