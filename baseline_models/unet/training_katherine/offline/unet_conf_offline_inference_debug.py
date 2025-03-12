@@ -1,4 +1,4 @@
-import numpy as np
+import cupy as np
 from sklearn.metrics import r2_score, mean_squared_error
 import torch
 import os, gc
@@ -6,23 +6,26 @@ from climsim_utils.data_utils import *
 from tqdm import tqdm
 
 
+
 input_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/scoring_input.npy'
 target_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/scoring_target.npy'
 preds_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full/scoring_set/'
 
-output_save_path = '/pscratch/sd/k/kfrields/hugging/scoring/unet_conf_output'
+output_save_path = '/pscratch/sd/k/kfrields/hugging/scoring/unet_conf_2_output/'
 
 
 grid_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
 norm_path = '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/'
 
-unet_adamW_model_path = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/model.pt'
+unet_adamW_conf_model_path = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf_2/model.pt'
+unet_adamW_model_path = '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW/model.pt'
 
-model_paths = {'unet_adamW_conf': unet_adamW_model_path}
 
-model_colors = {'unet_adamW_conf': 'red'}
+model_paths = {'unet_adamW': unet_adamW_model_path, 'unet_adamW_conf': unet_adamW_conf_model_path}
 
-model_labels = {'unet_adamW_conf': 'unet_adamW_conf'}
+model_colors = {'unet_adamW': 'blue', 'unet_adamW_conf': 'green'}
+
+model_labels = {'unet_adamW': 'unet_adamW', 'unet_adamW_conf': 'unet_adamW_conf'}
 
 num_models = len(model_paths)
 model_preds = {}
@@ -77,11 +80,9 @@ lon = grid_info['lon'].values
 lat_bin_mids = data.lat_bin_mids
 
 
-
-
 def preprocessing_v2_rh_mc(data, input_path, target_path):
-    npy_input = np.load(input_path)[:7680, :]
-    npy_target = np.load(target_path)[:7680, :]
+    npy_input = np.load(input_path)[:, :]
+    npy_target = np.load(target_path)[:, :]
 
     #de-normalizies the input
     surface_pressure = npy_input[:, data.ps_index] * \
@@ -109,8 +110,9 @@ def preprocessing_v2_rh_mc(data, input_path, target_path):
 torch_input, reshaped_target, pressures_binned = preprocessing_v2_rh_mc(data, input_path, target_path)
 
 
+
 # model inference
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'gpu')
 for model_name in model_paths.keys():
     model = torch.jit.load(model_paths[model_name]).to(device)
     model.eval()
@@ -119,8 +121,13 @@ for model_name in model_paths.keys():
     with torch.no_grad():
         for i in tqdm(range(0, torch_input.shape[0], batch_size)):
             batch = torch_input[i : i + batch_size, :].to(device)
-            model_batch_pred = model(batch) # inference on batch
+            if model_name == 'unet_adamW_conf':
+                model_batch_pred,model_batch_conf  = model(batch) # inference on batch
+                model_batch_conf = model_batch_conf.cpu().numpy()
+            else:
+                model_batch_pred = model(batch)
             model_batch_pred_list.append(model_batch_pred.cpu().numpy() / out_scale)
+            #model_batch_pred_list.append(np.asarray(model_batch_pred) / out_scale)
     model_preds[model_name] = np.stack(model_batch_pred_list, axis = 0) # 0 axis corresponds to time
     np.save(f'{output_save_path}{model_name}_preds.npy', model_preds[model_name])
     
@@ -129,6 +136,7 @@ for model_name in model_paths.keys():
     gc.collect()
 
 
+#PLOT Unet VS CONF R^2
 def show_r2(target, preds):
     assert target.shape == preds.shape
     new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
@@ -138,6 +146,8 @@ def show_r2(target, preds):
     r2_scores_capped = r2_scores.copy()
     r2_scores_capped[r2_scores_capped < 0] = 0
     return r2_scores, r2_scores_capped
+
+
 
 
 
@@ -165,6 +175,11 @@ plt.clf()
 #plt.show()
 
 
+
+ 
+#PLOT VERTICALLY RESOLVED TENDENCIES
+
+
 def get_coeff(target, pred):
     rss = np.sum((pred - target)**2, axis = 0)
     tss = np.sum((target - np.mean(target, axis = 0)[None,:,:])**2, axis = 0)
@@ -184,29 +199,29 @@ y = np.arange(60)
 X, Y = np.meshgrid(np.sin(np.pi*lat_bin_mids/180), y)
 Y = (1/100) * np.mean(pressures_binned, axis = 0).T
 for i, model_name in enumerate(model_paths.keys()):
-    contour_plot_heating = ax[0,i].pcolor(X, Y, zonal_heating_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1)
-    ax[0,i].contour(X, Y, zonal_heating_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
-    ax[0,i].contour(X, Y, zonal_heating_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
-    ax[0,i].set_ylim(ax[0,i].get_ylim()[::-1])
-    ax[0,i].set_title(f'{model_labels[model_name]} (heating)', fontsize = 20)
-    ax[0,i].set_xticks([])
-    contour_plot = ax[1,i].pcolor(X, Y, zonal_moistening_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1) # pcolormesh
-    ax[1,i].contour(X, Y, zonal_moistening_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
-    ax[1,i].contour(X, Y, zonal_moistening_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
-    ax[1,i].set_ylim(ax[1,i].get_ylim()[::-1])
-    ax[1,i].set_title(f'{model_labels[model_name]} (moistening)', fontsize = 20)
-    ax[1,i].xaxis.set_ticks([np.sin(-50/180*np.pi), 0, np.sin(50/180*np.pi)])
-    ax[1,i].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'], fontsize = 16)
-    ax[1,i].xaxis.set_tick_params(width = 2)
+    contour_plot_heating = ax[i,0].pcolor(X, Y, zonal_heating_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1)
+    ax[i,0].contour(X, Y, zonal_heating_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
+    ax[i,0].contour(X, Y, zonal_heating_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
+    ax[i,0].set_ylim(ax[i,0].get_ylim()[::-1])
+    ax[i,0].set_title(f'{model_labels[model_name]} (heating)', fontsize = 20)
+    ax[i,0].set_xticks([])
+    contour_plot = ax[i,1].pcolor(X, Y, zonal_moistening_r2[model_name].T, cmap='Blues', vmin = 0, vmax = 1) # pcolormesh
+    ax[i,1].contour(X, Y, zonal_moistening_r2[model_name].T, [0.7], colors='orange', linewidths=[4])
+    ax[i,1].contour(X, Y, zonal_moistening_r2[model_name].T, [0.9], colors='yellow', linewidths=[4])
+    ax[i,1].set_ylim(ax[i,1].get_ylim()[::-1])
+    ax[i,1].set_title(f'{model_labels[model_name]} (moistening)', fontsize = 20)
+    ax[i,1].xaxis.set_ticks([np.sin(-50/180*np.pi), 0, np.sin(50/180*np.pi)])
+    ax[i,1].xaxis.set_ticklabels(['50$^\circ$S', '0$^\circ$', '50$^\circ$N'], fontsize = 16)
+    ax[i,1].xaxis.set_tick_params(width = 2)
     if i != 0:
-        ax[0,i].set_yticks([])
-        ax[1,i].set_yticks([])
-ax[0,0].set_ylabel("Pressure [hPa]", fontsize = 22)
-ax[0,0].yaxis.set_label_coords(-0.2,-0.09) # (-1.38,-0.09)
-ax[0,0].yaxis.set_tick_params(labelsize = 14)
-ax[1,0].yaxis.set_tick_params(labelsize = 14)
-ax[0,0].yaxis.set_ticks([1000,800,600,400,200,0])
-ax[1,0].yaxis.set_ticks([1000,800,600,400,200,0])
+        ax[i,0].set_yticks([])
+        ax[i,1].set_yticks([])
+ax[i,0].set_ylabel("Pressure [hPa]", fontsize = 22)
+ax[i,0].yaxis.set_label_coords(-0.2,-0.09) # (-1.38,-0.09)
+ax[i,0].yaxis.set_tick_params(labelsize = 14)
+ax[i,1].yaxis.set_tick_params(labelsize = 14)
+ax[i,0].yaxis.set_ticks([1000,800,600,400,200,0])
+ax[i,1].yaxis.set_ticks([1000,800,600,400,200,0])
 fig.subplots_adjust(right=0.8)
 cbar_ax = fig.add_axes([0.82, 0.12, 0.02, 0.76])
 cb = fig.colorbar(contour_plot, cax=cbar_ax)
@@ -218,7 +233,7 @@ plt.clf()
 
 
 
-
+#PLOT RMSE
 def show_rmse(target, preds):
     assert target.shape == preds.shape
     new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
@@ -259,7 +274,7 @@ plt.savefig(output_save_path + 'unet_rmse_lines.png')
 plt.clf()
 
 
-
+#PLOT SCALAR RMSE
 fig, ax = plt.subplots(4,2, figsize = (8,15))
 scalar_start_index = 300
 scalar_labels = ['cam_out_NETSW','cam_out_FLWDS','cam_out_PRECSC', 'cam_out_PRECC','cam_out_SOLS','cam_out_SOLL', 'cam_out_SOLSD','cam_out_SOLLD']
@@ -284,9 +299,7 @@ plt.savefig(output_save_path + 'unet_rmse_scalar_bars.png')
 plt.clf()
 
 
-
-
-
+#PLOT VERTICALLY RESOLVED RMSE
 def get_rmse_coeff(target, pred):
     n = target.shape[0]
     num = np.sum((target - np.mean(target, axis = 0)[None,:,:])**2, axis = 0)
@@ -336,9 +349,12 @@ cbc.set_label("Skill Score "+r'$\left(\mathrm{RMSE}\right)$ (kg/kg/s)',labelpad=
 plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.97, fontsize = 22)
 plt.subplots_adjust(hspace=0.1)
 plt.savefig(output_save_path + 'unet_press_lat_rmse_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
+#plt.show()
+plt.clf()
 
 
 
+#PLOT BIAS
 def show_bias(target, preds):
     assert target.shape == preds.shape
     new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
@@ -379,6 +395,9 @@ plt.savefig(output_save_path + 'unet_bias_lines.png')
 plt.clf()
 
 
+
+
+#PLOT SCALAR BIAS
 fig, ax = plt.subplots(4,2, figsize = (12,15))
 scalar_start_index = 300
 scalar_labels = ['cam_out_NETSW','cam_out_FLWDS','cam_out_PRECSC', 'cam_out_PRECC','cam_out_SOLS','cam_out_SOLL', 'cam_out_SOLSD','cam_out_SOLLD']
@@ -409,6 +428,10 @@ plt.savefig(output_save_path + 'unet_bias_scalar_bars.png')
 plt.clf()
 
 
+
+
+
+#PLOT BIAS VERTICALLY RESOLVED TENDENCIES
 def get_bias_coeff(target, pred):
     coeff = np.subtract(np.mean(pred, axis = 0), np.mean(target, axis = 0))
     #num = np.sum((target - np.mean(target, axis = 0)[None,:,:])**2, axis = 0)
@@ -461,6 +484,194 @@ plt.suptitle("Baseline Models Skill for Vertically Resolved Tendencies", y = 0.9
 plt.subplots_adjust(hspace=0.1)
 plt.savefig(output_save_path + 'unet_press_lat_bias_models.png', bbox_inches='tight', pad_inches=0.1 , dpi = 300)
 plt.clf()
+
+
+
+#PLOT CONF LOSS VS R2
+def show_r2(target, preds):
+    assert target.shape == preds.shape
+    new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
+    target_flattened = target.reshape(new_shape)
+    preds_flattened = preds.reshape(new_shape)
+    r2_scores = np.array([r2_score(target_flattened[:, i], preds_flattened[:, i]) for i in range(308)])
+    r2_scores_capped = r2_scores.copy()
+    r2_scores_capped[r2_scores_capped < 0] = 0
+    return r2_scores, r2_scores_capped
+
+
+feature_indices = [0, 60, 120, 180, 240, 300, 308]
+
+fig, ax = plt.subplots(5, figsize = (10,15))
+second_axes = []
+
+conf_avgs = show_confidence(model_batch_conf)
+label_text = f'unet_adamW_conf' 
+
+r2_scores['unet_adamW_conf'], r2_scores_capped['unet_adamW_conf'] = show_r2(reshaped_target, model_preds['unet_adamW_conf'])
+
+
+for feature_i in range(5):
+    starting_index = feature_indices[feature_i]
+    ending_index = feature_indices[feature_i + 1]
+    xaxis = np.arange(ending_index - starting_index)
+    ax[feature_i].plot(xaxis, conf_avgs[starting_index: ending_index], color = 'red', label="Confidence Loss")
+    ax2 = ax[feature_i].twinx()
+    second_axes.append(ax2)
+    ax2.plot(xaxis, r2_scores_capped['unet_adamW_conf'][starting_index: ending_index], color = 'black', label="R2")
+
+feature_labels = ['dT', 'dQv', 'dQn (liq+ice)', 'dU', 'dV']
+feature_units = ['(K/s)', '(kg/kg/s)', '(kg/kg/s)', '(m/$s^2$)', '(m/$s^2$)']
+for feature_i in range(5):
+    ax[feature_i].set_title(f'{feature_labels[feature_i]}')
+    ax[feature_i].set_ylabel(f'Confidence Loss')
+    ax[feature_i].legend(loc = 2)
+    second_axes[feature_i].legend(loc = 6)
+    second_axes[feature_i].set_ylabel(f'R2')
+    second_axes[feature_i].invert_yaxis()
+    
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_conf_r2.png')
+#plt.show()
+plt.clf()
+
+
+
+#PLOT CONF LOSS VS RMSE
+def show_rmse(target, preds):
+    assert target.shape == preds.shape
+    new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
+    target_flattened = target.reshape(new_shape)
+    preds_flattened = preds.reshape(new_shape)
+    #print(preds_flattened.shape)
+    rmse_scores = np.array([np.sqrt(mean_squared_error(target_flattened[:, i], preds_flattened[:, i])) for i in range(308)])
+    #rint(rmse_scores.shape)
+    rmse_scores_capped = rmse_scores.copy()
+    rmse_scores_capped[rmse_scores_capped < 0] = 0
+    return rmse_scores, rmse_scores_capped
+    
+def show_confidence(conf):
+    #print(preds_flattened.shape)
+    conf_avgs = np.array([np.mean(conf[:, i].flatten()) for i in range(308)])
+    #rint(rmse_scores.shape)
+    return conf_avgs
+
+
+feature_indices = [0, 60, 120, 180, 240, 300, 308]
+
+fig, ax = plt.subplots(5, figsize = (10,15))
+second_axes = []
+
+conf_avgs = show_confidence(model_batch_conf)
+label_text = f'unet_adamW_conf' 
+
+rmse_scores['unet_adamW_conf'], rmse_scores_capped['unet_adamW_conf'] = show_rmse(reshaped_target, model_preds['unet_adamW_conf'])
+
+
+for feature_i in range(5):
+    starting_index = feature_indices[feature_i]
+    ending_index = feature_indices[feature_i + 1]
+    xaxis = np.arange(ending_index - starting_index)
+    ax[feature_i].plot(xaxis, conf_avgs[starting_index: ending_index], color = 'red', label="Confidence Loss")
+    ax2 = ax[feature_i].twinx()
+    second_axes.append(ax2)
+    ax2.plot(xaxis, rmse_scores['unet_adamW_conf'][starting_index: ending_index], color = 'black', label="RMSE")
+
+feature_labels = ['dT', 'dQv', 'dQn (liq+ice)', 'dU', 'dV']
+feature_units = ['(K/s)', '(kg/kg/s)', '(kg/kg/s)', '(m/$s^2$)', '(m/$s^2$)']
+for feature_i in range(5):
+    ax[feature_i].set_title(f'{feature_labels[feature_i]}')
+    ax[feature_i].set_ylabel(f'Confidence Loss')
+    ax[feature_i].legend(loc = 2)
+    second_axes[feature_i].legend(loc = 6)
+    second_axes[feature_i].set_ylabel(f'RMSE {feature_units[feature_i]}')
+    
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_RMSE_conf.png')
+#plt.show()
+plt.clf()
+
+
+
+
+
+#PLOT SKILL
+
+
+def show_rmse(target, preds):
+    assert target.shape == preds.shape
+    new_shape = (np.prod(target.shape[:-1]), target.shape[-1])
+    target_flattened = target.reshape(new_shape)
+    preds_flattened = preds.reshape(new_shape)
+    #print(preds_flattened.shape)
+    rmse_scores = np.array([np.sqrt(mean_squared_error(target_flattened[:, i], preds_flattened[:, i])) for i in range(308)])
+    #rint(rmse_scores.shape)
+    rmse_scores_capped = rmse_scores.copy()
+    rmse_scores_capped[rmse_scores_capped < 0] = 0
+    return rmse_scores, rmse_scores_capped
+
+def show_confidence(conf):
+    #print(preds_flattened.shape)
+    conf_avgs = np.array([np.mean(conf[:, i].flatten()) for i in range(308)])
+    #rint(rmse_scores.shape)
+    return conf_avgs
+
+
+
+conf_avgs = show_confidence(model_batch_conf)
+
+
+feature_indices = [0, 60, 120, 180, 240, 300, 308]
+
+fig, ax = plt.subplots(5, figsize = (10,15))
+
+rmse_scores['unet_adamW_conf'], rmse_scores_capped['unet_adamW_conf'] = show_rmse(reshaped_target, model_preds['unet_adamW'])
+label_text = model_labels['unet_adamW_conf']
+
+for feature_i in range(5):
+    starting_index = feature_indices[feature_i]
+    ending_index = feature_indices[feature_i + 1]
+    
+    ax[feature_i].scatter(conf_avgs[starting_index: ending_index], rmse_scores['unet_adamW'][starting_index: ending_index], color = model_colors['unet_adamW_conf'], label=f"{label_text}")
+
+
+feature_labels = ['dT', 'dQv', 'dQn (liq+ice)', 'dU', 'dV']
+feature_units = ['(K/s)', '(kg/kg/s)', '(kg/kg/s)', '(m/$s^2$)', '(m/$s^2$)']
+for feature_i in range(5):
+    ax[feature_i].set_title(f'{feature_labels[feature_i]}')
+    ax[feature_i].set_ylabel(f'RMSE {feature_units[feature_i]}')
+    ax[feature_i].set_xlabel(f'Confidence Loss')
+    ax[feature_i].legend()
+    
+fig.tight_layout()
+plt.savefig(output_save_path + 'unet_rmse_lines.png')
+#plt.show()
+plt.clf()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
