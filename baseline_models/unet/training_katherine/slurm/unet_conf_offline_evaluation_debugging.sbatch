@@ -13,7 +13,7 @@
 #SBATCH --output=out_%j.out
 #SBATCH --error=eo_%j.err
 
-cmd="python unet_offline_inference_debug.py"
+cmd="offline/python unet_offline_inference_debug.py"
 
-cd /global/cfs/cdirs/m4334/kfrields/climsim3/baseline_models/unet/training_katherine/offline
+cd /global/cfs/cdirs/m4334/kfrields/climsim3/baseline_models/unet/training_katherine
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
