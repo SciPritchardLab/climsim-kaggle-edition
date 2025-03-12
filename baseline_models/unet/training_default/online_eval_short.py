@@ -63,31 +63,27 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     ds_nn = xr.open_mfdataset(nn_path)
     ds_sp = xr.open_mfdataset(mmf_path)
     num_hours = ds_nn[var].sizes['time']
-
+    cmap = 'coolwarm'
     if var == 'T':
         var_name = 'Temperature'
         units = 'K'
-        cmap = 'coolwarm'
         vmin = -5
         vmax = 5
     elif var == 'Q':
         var_name = 'Moisture'
         units = 'g/kg'
-        cmap = 'managua'
         vmin = -.008
         vmax = .008
     elif var == 'CLDLIQ':
         var_name = 'Liquid Cloud'
         units = 'mg/kg'
-        cmap = 'managua'
-        vmin = -1e-4 # placeholder
-        vmax = 1e-4 # placeholder
+        vmin = -1e-4
+        vmax = 1e-4
     elif var == 'CLDICE':
         var_name = 'Ice Cloud'
         units = 'mg/kg'
-        cmap = 'managua'
-        vmin = -1e-4 # placeholder
-        vmax = 1e-4 # placeholder
+        vmin = -1e-4
+        vmax = 1e-4
 
     arr_nn = ds_nn[var].values
     arr_sp = ds_sp[var].values
