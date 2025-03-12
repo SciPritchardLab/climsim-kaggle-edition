@@ -12,7 +12,7 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'unet_conf_1_year_debug'
+case_prefix = 'unet_conf_1_year'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
@@ -49,7 +49,7 @@ debug_mode = False
 dtime = 1200 # set to 0 to use a default value 
 
 #stop_opt,stop_n,resub,walltime = 'nmonths',1, 1, '00:30:00'
-stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'00:10:00'
+stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'01:30:00'
 #stop_opt,stop_n,resub,walltime = 'ndays',10, 0,'00:30:00'
 
 ne,npg=4,2;  num_nodes=2  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
@@ -62,7 +62,7 @@ compset,arch   = 'F2010-MMF1','GNUGPU'
 # (MMF1: Note that MMF_VT is tunred off for MMF_NN_EMULATOR in $E3SMROOT/components/eam/cime_config/config_component.xml)  
 
 #queue = 'regular'
-queue = 'debug'
+queue = 'regular'
 
 # case_list = [case_prefix,arch,compset,grid]
 case_list = [case_prefix, ]
