@@ -15,5 +15,5 @@
 
 cmd="python train_squeezeformer.py --config-name=config_seed_43"
 
-cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/squeezeformer/training_jerry
+cd ..
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"

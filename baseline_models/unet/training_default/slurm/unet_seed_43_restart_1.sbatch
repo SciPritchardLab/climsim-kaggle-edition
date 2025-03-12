@@ -2,7 +2,7 @@
 #SBATCH -A m4334
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 24:00:00
+#SBATCH -t 12:00:00
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4
@@ -13,7 +13,7 @@
 ##SBATCH --output=out_%j.out
 ##SBATCH --error=eo_%j.err
 
-cmd="python train_pao_model.py --config-name=config_seed_43"
+cmd="python train_unet.py --config-name=config_seed_43_restart_1"
 
-cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pao_model/training_jerry
+cd ..
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"

@@ -83,8 +83,6 @@ class Squeezeformer(modulus.Module):
                           head_dim = self.head_dim)
         self.final_dense_pred = nn.Linear(in_features = head_dim,
                                           out_features = self.target_profile_num + self.target_scalar_num)
-        self.final_dense_confidence = nn.Linear(in_features = head_dim,
-                                                out_features = self.target_profile_num + self.target_scalar_num)
 
     def forward(self, x):
         # reshape input
