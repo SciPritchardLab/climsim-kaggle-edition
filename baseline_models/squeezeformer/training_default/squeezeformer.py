@@ -5,12 +5,10 @@ import torch.nn as nn
 from dataclasses import dataclass
 import modulus
 from layers import (
-    Reshape1,
     Conv1DBlockSqueezeformer,
     TransformerEncoder,
     HeadDense,
     GLUMlp,
-    Reshape2,
 )
 from typing import List
 """
@@ -85,14 +83,12 @@ class Squeezeformer(modulus.Module):
                           head_dim = self.head_dim)
         self.final_dense_pred = nn.Linear(in_features = head_dim,
                                           out_features = self.target_profile_num + self.target_scalar_num)
-        self.final_dense_confidence = nn.Linear(in_features = head_dim,
-                                                out_features = self.target_profile_num + self.target_scalar_num)
 
     def forward(self, x):
         # reshape input
         profile_part = x[:,:self.input_profile_num*self.vertical_level_num].reshape(-1,self.input_profile_num,self.vertical_level_num).transpose(1,2)
         scalar_part = x[:,self.input_profile_num*self.vertical_level_num:].unsqueeze(1).repeat(1,self.vertical_level_num,1)
-        x = torch.cat([profile_part, scalar_part], dim = -1)
+        x = torch.cat([profile_part, scalar_part], dim = -1) # b, 60, 26
 
         x = self.dense(x)
         x = self.layer_norm(x)
@@ -104,12 +100,12 @@ class Squeezeformer(modulus.Module):
 
         outputs = self.final_dense_pred(x)
 
-        profile_part = outputs[:,:,:self.target_profile_num * self.vertical_level_num]
+        profile_part = outputs[:,:,:self.target_profile_num]
         profile_part = profile_part.permute(0,2,1).reshape(-1,self.target_profile_num * self.vertical_level_num) # b,300
-        scalar_part = outputs[:,:,self.target_profile_num * self.vertical_level_num:]
-        scalar_part = torch.mean(scalar_part, dim=1) # b,8
+        scalar_part = outputs[:,:,self.target_profile_num:]
+        scalar_part = torch.mean(scalar_part, dim=1)
 
-        y = torch.concat([profile_part, scalar_part], dim=1)
+        y = torch.concat([profile_part, scalar_part], dim=1) # b, 308
 
         if self.output_prune:
             # Zeyuan says that the .clone() and .clone().zero_() helped bypass a torchscript issue. Reason unclear.

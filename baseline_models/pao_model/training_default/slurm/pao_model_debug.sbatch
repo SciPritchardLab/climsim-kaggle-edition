@@ -13,7 +13,7 @@
 ##SBATCH --output=out_%j.out
 ##SBATCH --error=eo_%j.err
 
-cmd="python train_squeezeformer.py --config-name=config_debug"
+cmd="python train_pao_model.py --config-name=config_debug"
 
-cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/squeezeformer/training_jerry
+cd ..
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"

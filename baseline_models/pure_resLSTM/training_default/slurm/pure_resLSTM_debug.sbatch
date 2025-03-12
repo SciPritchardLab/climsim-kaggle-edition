@@ -15,5 +15,5 @@
 
 cmd="python train_pure_resLSTM.py --config-name=config_debug"
 
-cd /global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pure_resLSTM/training_jerry
+cd ..
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
