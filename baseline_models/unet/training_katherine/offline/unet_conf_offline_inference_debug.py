@@ -170,7 +170,7 @@ plt.grid(True)
 
 # Show the plot
 plt.tight_layout()
-plt.savefig(output_save_path + 'unet_r2_lines.png')
+plt.savefig(output_save_path + 'unet_r2_conf_lines.png')
 plt.clf()
 #plt.show()
 
@@ -643,7 +643,7 @@ for feature_i in range(5):
     ax[feature_i].legend()
     
 fig.tight_layout()
-plt.savefig(output_save_path + 'unet_rmse_lines.png')
+plt.savefig(output_save_path + 'unet_skill.png')
 #plt.show()
 plt.clf()
 
