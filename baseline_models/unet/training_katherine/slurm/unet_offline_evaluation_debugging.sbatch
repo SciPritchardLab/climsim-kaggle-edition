@@ -15,5 +15,5 @@
 
 cmd="python unet_conf_offline_inference_debug.py"
 
-cd /global/cfs/cdirs/m4334/kfrields/climsim3/baseline_models/unet/training_katherine
+cd /global/cfs/cdirs/m4334/kfrields/climsim3/baseline_models/unet/offline/training_katherine
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"
