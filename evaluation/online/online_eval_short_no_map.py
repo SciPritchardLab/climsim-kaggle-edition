@@ -133,7 +133,7 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     ax.set_ylabel('Hybrid Pressure (hPa)',fontsize=14)
     ax.tick_params(axis='both', which='major', labelsize=12)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'first_month_zonal_mean_bias.png'))
+    plt.savefig(os.path.join(save_path, 'first_month_zonal_mean_bias_Q.png'))
     plt.clf()
 
 
