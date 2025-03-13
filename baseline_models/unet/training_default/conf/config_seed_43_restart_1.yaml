@@ -1,0 +1,128 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023 - 2024 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-FileCopyrightText: All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# defaults:
+#   - override hydra/sweeper: optuna
+#   - override hydra/sweeper/sampler: tpe
+#   - override hydra/launcher: joblib
+
+# defaults:
+#   - _self_
+#   - optuna_config: optuna_sweep.yaml
+
+# hydra:
+#   sweeper:
+#     sampler:
+#       seed: 123
+#     direction: minimize
+#     study_name: simple_objective
+#     storage: null
+#     n_trials: 8
+#     n_jobs: 2
+#     params:
+#       batch_size: choice(512, 1024, 2048)
+#       learning_rate: choice(0.1, 0.01, 0.001, 0.0001)
+#    # launcher:
+#    #  n_jobs: 2
+
+# paths to training and validation data
+data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/train_set/'
+val_input_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_input.npy'
+val_target_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_target.npy'
+
+# data_utils parameters and settings
+grid_info_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc'
+input_mean_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v2_rh_mc_pervar.nc'
+input_max_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v2_rh_mc_pervar.nc'
+input_min_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v2_rh_mc_pervar.nc'
+output_scale_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v2_rh_mc.nc'
+variable_subsets: 'v2_rh_mc'
+
+# dataset preprocessing settings
+qinput_prune: True # (bool): Whether to prune the input data
+output_prune: True # (bool): Whether to prune the output data
+strato_lev: 15 # (int): Number of levels in the stratosphere
+qn_lbd_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qn_exp_lambda_large.txt'
+# (np.ndarray) coefficients for the exponential transformation of qn
+decouple_cloud: False
+aggressive_pruning: False
+strato_lev_qc: 30 # only active during aggressive pruning
+strato_lev_qinput: 22 # only active during aggressive pruning
+strato_lev_tinput: -1 # only active if strato_lev_tinput > 0
+strato_lev_out: 12
+input_clip: True
+input_clip_rhonly: True
+# the difference between strato_lev and strato_lev_out is that strato_lev is used as a reference for pruning the input
+# and strato_lev_out is a constant value for pruning the output vector
+
+# training settings
+seed: 43
+restart_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/unet_seed_43/ckpt/ckpt_epoch_8_metric_0.0722.mdlus'
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/'
+expname: 'unet_seed_43_restart_1'
+num_workers: 32
+batch_size: 1024
+epochs: 24
+learning_rate: 0.00001
+save_top_ckpts: 15
+top_ckpt_mode: 'min'
+optimizer: 'AdamW'
+loss: 'Huber'
+scheduler_name: 'step'
+scheduler:
+   step:
+      step_size: 3
+      gamma: .05
+   plateau:
+      patience: 2
+      factor: 0.1
+   cosine:
+      T_max: 2
+      eta_min: 0.00001
+   cosine_warmup:
+      T_0: 5
+      T_mult: 1
+      eta_min: 1.5e-6
+scheduler_warmup: 
+   enable: False
+   warmup_steps: 20
+   warmup_strategy: 'cos'
+   init_lr: 1e-7
+early_stop_step: -1
+logger: 'wandb'
+wandb:
+   project: "climsim3_ensembles"
+   entity: "cbrain"
+
+# model hyperparameters
+dropout: 0.0
+loc_embedding: False
+embedding_type: "positional"
+num_blocks: 2
+attn_resolutions: [0]
+model_channels: 128
+skip_conv: False
+prev_2d: False
+seq_resolution: 64
+label_dim: 0
+augment_dim: 0
+channel_mult: [1, 2, 2, 2]
+channel_mult_emb: 4
+label_dropout: 0.0
+channel_mult_noise: 1
+encoder_type: "standard"
+decoder_type: "standard"
+resample_filter: [1, 1]
