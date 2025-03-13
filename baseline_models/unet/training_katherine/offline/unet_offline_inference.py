@@ -60,7 +60,6 @@ lbd_qn = np.loadtxt(norm_path + lbd_qn_file, delimiter = ',')
 
 
 
-
 data = data_utils(grid_info = grid_info, 
                   input_mean = input_mean, 
                   input_max = input_max, 

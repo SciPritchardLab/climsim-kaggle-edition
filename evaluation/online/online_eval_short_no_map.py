@@ -73,13 +73,13 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     elif var == 'Q':
         var_name = 'Moisture'
         units = 'g/kg'
-        cmap = 'Blues'
+        cmap = 'coolwarm'
         vmin = -5 # placeholder
         vmax = 5 # placeholder
     elif var == 'CLDLIQ':
         var_name = 'Liquid Cloud'
         units = 'mg/kg'
-        cmap = 'bone'
+        cmap = 'coolwarm'
         vmin = -5 # placeholder
         vmax = 5 # placeholder
 
