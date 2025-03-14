@@ -31,7 +31,7 @@ class UnetMetaData(modulus.ModelMetaData):
     amp_cpu: bool = False
     amp_gpu: bool = False
 
-class UnetModel(modulus.Module):
+class Unet(modulus.Module):
     def __init__(
             self, 
             input_profile_num: int = 9, # number of input profile variables

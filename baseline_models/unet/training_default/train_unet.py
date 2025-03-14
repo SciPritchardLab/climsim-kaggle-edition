@@ -19,7 +19,7 @@ from modulus.launch.logging import (
 from climsim_utils.data_utils import *
 
 from climsim_datasets import TrainingDataset, ValidationDataset
-from unet import UnetModel
+from unet import Unet
 from wrap_model import WrappedModel
 import hydra
 from torch.nn.parallel import DistributedDataParallel
@@ -152,7 +152,7 @@ def main(cfg: DictConfig) -> float:
     attn_resolutions = OmegaConf.to_container(cfg.attn_resolutions, resolve = True)
     channel_mult = OmegaConf.to_container(cfg.channel_mult, resolve = True)
     resample_filter = OmegaConf.to_container(cfg.resample_filter, resolve = True)
-    model = UnetModel(
+    model = Unet(
         input_profile_num = data.input_profile_num,
         input_scalar_num = data.input_scalar_num,
         target_profile_num = data.target_profile_num,

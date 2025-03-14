@@ -173,7 +173,6 @@ class Conv1DBlockSqueezeformer(nn.Module):
         self.dilation_rate = dilation_rate
         self.expand_ratio = expand_ratio
         self.activation = activation
-        self.scale_bias = ScaleBias(channel_size)
         self.glu_layer = GLU()
         self.ffn = GLUMlp(self.channel_size * self.expand_ratio, self.channel_size)
         self.layer_norm_2 = nn.LayerNorm(channel_size, eps=1e-6)
