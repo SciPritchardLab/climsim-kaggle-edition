@@ -313,7 +313,7 @@ class Unet(modulus.Module):
         # broadcast x_scalar to (batch, input_scalar_num, levels)
         x_scalar = x_scalar.unsqueeze(2).expand(-1, -1, self.vertical_level_num)
 
-        #concatenate x_profile, x_scalar, x_loc to (batch, input_profile_num+input_scalar_num+8, levels)
+        #concatenate x_profile, x_scalar, x_loc to (batch, input_profile_num+input_scalar_num, levels)
         x = torch.cat((x_profile, x_scalar), dim=1)
         # print('2:', x.shape)
         # x = torch.cat((x_profile, x_scalar), dim=1)
