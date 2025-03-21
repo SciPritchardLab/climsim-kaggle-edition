@@ -14,6 +14,7 @@ shifter python online_eval_short.py \
         --mmf_path '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/mmf_runs/mmf_speedeval_gpu/run/mmf_speedeval_gpu.eam.h2.0003-01-*.nc' \
         --nn_path '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/unet_adamW_conf/online/unet_conf_debug_3/run/unet_conf_debug_3.eam.h2.0003-01-*.nc' \
         --save_path '/pscratch/sd/k/kfrields/hugging/scoring/unet_conf_output' \
+        --var 'T' \
         --max_day 20 \
         --grid_path '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc' \
         --input_mean_file 'input_mean_v6_pervar.nc' \
