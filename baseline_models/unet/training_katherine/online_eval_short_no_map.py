@@ -33,11 +33,11 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
          output_scale_file, lbd_qn_file):
 
     grid_info = xr.open_dataset(grid_path)
-    input_mean = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_mean_file)
-    input_max = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_max_file)
-    input_min = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_min_file)
-    output_scale = xr.open_dataset('../../preprocessing/normalizations/outputs/' + output_scale_file)
-    lbd_qn = np.loadtxt('../../preprocessing/normalizations/inputs/' + lbd_qn_file, delimiter = ',')
+    input_mean = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + input_mean_file)
+    input_max = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + input_max_file)
+    input_min = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + input_min_file)
+    output_scale = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/' + output_scale_file)
+    lbd_qn = np.loadtxt('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + lbd_qn_file, delimiter = ',')
 
     data = data_utils(grid_info = grid_info, 
                     input_mean = input_mean, 
