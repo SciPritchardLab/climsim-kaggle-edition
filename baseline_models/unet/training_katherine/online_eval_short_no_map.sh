@@ -16,3 +16,9 @@ shifter python online_eval_short_no_map.py \
         --save_path '/pscratch/sd/k/kfrields/hugging/scoring/unet_adamW_output' \
         --var 'T' \
         --max_day 20 \
+        --grid_path '/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc' \
+        --input_mean_file 'input_mean_v6_pervar.nc' \
+        --input_max_file 'input_max_v6_pervar.nc' \
+        --input_min_file 'input_min_v6_pervar.nc' \
+        --output_scale_file 'output_scale_std_lowerthred_v6.nc' \
+        --lbd_qn_file 'qn_exp_lambda_large.txt'
