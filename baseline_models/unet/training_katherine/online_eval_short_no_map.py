@@ -74,14 +74,14 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
         var_name = 'Moisture'
         units = 'g/kg'
         cmap = 'coolwarm'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        vmin = -.008
+        vmax = .008
     elif var == 'CLDLIQ':
         var_name = 'Liquid Cloud'
         units = 'mg/kg'
         cmap = 'coolwarm'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        vmin = -1e-4
+        vmax = 1e-4
 
     arr_nn = ds_nn[var].values
     arr_sp = ds_sp[var].values
