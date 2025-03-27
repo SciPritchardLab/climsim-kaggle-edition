@@ -71,8 +71,8 @@ input_clip_rhonly: True
 # training settings
 seed: 43
 restart_path: ''
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/convnext/'
-expname: 'convnext_seed_43'
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/unet/'
+expname: 'unet_large_seed_43'
 num_workers: 32
 batch_size: 1024
 epochs: 12
@@ -108,11 +108,21 @@ wandb:
    entity: "cbrain"
 
 # model hyperparameters
+dropout: 0.0
 loc_embedding: False
 embedding_type: "positional"
-depths: [3, 3, 9, 3]
-kernel_sizes: [4, 2, 2, 2]
-dims: [96, 192, 384, 768]
-layer_scale_init_value: 1e-6
-block_type: 'block'
-block_kernel_size: 7
+num_blocks: 2
+attn_resolutions: [0]
+model_channels: 256
+skip_conv: False
+prev_2d: False
+seq_resolution: 64
+label_dim: 0
+augment_dim: 0
+channel_mult: [1, 2, 2, 2]
+channel_mult_emb: 4
+label_dropout: 0.0
+channel_mult_noise: 1
+encoder_type: "standard"
+decoder_type: "standard"
+resample_filter: [1, 1]

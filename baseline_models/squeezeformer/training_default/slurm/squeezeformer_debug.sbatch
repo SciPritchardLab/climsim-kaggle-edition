@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -A m4334
-#SBATCH -C gpu
+#SBATCH -C gpu&hbm80g
 #SBATCH -q debug
 #SBATCH -t 30:00
 #SBATCH --ntasks-per-node 4
