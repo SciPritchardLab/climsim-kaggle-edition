@@ -33,11 +33,11 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
          output_scale_file, lbd_qn_file):
 
     grid_info = xr.open_dataset(grid_path)
-    input_mean = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_mean_file)
-    input_max = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_max_file)
-    input_min = xr.open_dataset('../../preprocessing/normalizations/inputs/' + input_min_file)
-    output_scale = xr.open_dataset('../../preprocessing/normalizations/outputs/' + output_scale_file)
-    lbd_qn = np.loadtxt('../../preprocessing/normalizations/inputs/' + lbd_qn_file, delimiter = ',')
+    input_mean = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + input_mean_file)
+    input_max = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + input_max_file)
+    input_min = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + input_min_file)
+    output_scale = xr.open_dataset('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/' + output_scale_file)
+    lbd_qn = np.loadtxt('/global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/' + lbd_qn_file, delimiter = ',')
 
     data = data_utils(grid_info = grid_info, 
                     input_mean = input_mean, 
@@ -63,25 +63,27 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     ds_nn = xr.open_mfdataset(nn_path)
     ds_sp = xr.open_mfdataset(mmf_path)
     num_hours = ds_nn[var].sizes['time']
-
+    cmap = 'coolwarm'
     if var == 'T':
         var_name = 'Temperature'
         units = 'K'
-        cmap = 'coolwarm'
         vmin = -5
         vmax = 5
     elif var == 'Q':
         var_name = 'Moisture'
         units = 'g/kg'
-        cmap = 'Blues'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        vmin = -.008
+        vmax = .008
     elif var == 'CLDLIQ':
         var_name = 'Liquid Cloud'
         units = 'mg/kg'
-        cmap = 'bone'
-        vmin = -5 # placeholder
-        vmax = 5 # placeholder
+        vmin = -1e-4
+        vmax = 1e-4
+    elif var == 'CLDICE':
+        var_name = 'Ice Cloud'
+        units = 'mg/kg'
+        vmin = -1e-4
+        vmax = 1e-4
 
     arr_nn = ds_nn[var].values
     arr_sp = ds_sp[var].values
@@ -133,7 +135,7 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
     ax.set_ylabel('Hybrid Pressure (hPa)',fontsize=14)
     ax.tick_params(axis='both', which='major', labelsize=12)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'first_month_zonal_mean_bias.png'))
+    plt.savefig(os.path.join(save_path, f'first_month_zonal_mean_bias_{var}.png'))
     plt.clf()
 
     movie_path = os.path.join(save_path, 'movies')
@@ -144,10 +146,9 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
         os.makedirs(movie_path)
     if os.path.exists(f'{movie_path}/{var}'):
         shutil.rmtree(f'{movie_path}/{var}')
-    else:
-        os.makedirs(f'{movie_path}/{var}')
+    os.makedirs(f'{movie_path}/{var}')
 
-    for hour in tqdm(range(num_hours)):
+    for hour in tqdm(range(min(672, num_hours))):
         image_file_name = f'{movie_path}/{var}/{var}_{str(hour).zfill(5)}.png'
 
         sp_zonal = xr.DataArray(arr_sp_zonal_mean[hour,:,:].T, dims = ['level', 'lat'],
@@ -286,7 +287,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_path', type=str, required = True, help='Path to save the plots.')
     parser.add_argument('--var', type=str, required = True, help='Variable of interest.')
     parser.add_argument('--max_day', type=int, default = 30, help='Maximum number of days to plot.')
-    parser.add_argument('--grid_path', type=str, default='../../grid_info/ClimSim_low-res_grid-info.nc', help='Path to grid info file.')
+    parser.add_argument('--grid_path', type=str, default='/global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc', help='Path to grid info file.')
     parser.add_argument('--input_mean_file', type=str, default = 'input_mean_v2_rh_mc_pervar.nc')
     parser.add_argument('--input_max_file', type=str, default = 'input_max_v2_rh_mc_pervar.nc')
     parser.add_argument('--input_min_file', type=str, default = 'input_min_v2_rh_mc_pervar.nc')

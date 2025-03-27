@@ -66,7 +66,7 @@ def main(case_dir, case_prefix, compiled_esm, f_torch_model, email_address = Non
       queue = 'regular'
       stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'3:00:00'
    else:
-      queue = 'debug'
+      queue = 'regular'
       stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'30:00'
 
    # case_list = [case_prefix,arch,compset,grid]
