@@ -1,0 +1,62 @@
+data_path: /pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/train_set/
+val_input_path: /pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_input.npy
+val_target_path: /pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc/val_set/val_target.npy
+grid_info_path: /global/cfs/cdirs/m4334/jerry/climsim3_dev/grid_info/ClimSim_low-res_grid-info.nc
+input_mean_path: /global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_mean_v2_rh_mc_pervar.nc
+input_max_path: /global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_max_v2_rh_mc_pervar.nc
+input_min_path: /global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/input_min_v2_rh_mc_pervar.nc
+output_scale_path: /global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/outputs/output_scale_std_lowerthred_v2_rh_mc.nc
+variable_subsets: v2_rh_mc
+qinput_prune: true
+output_prune: true
+strato_lev: 15
+qn_lbd_path: /global/cfs/cdirs/m4334/jerry/climsim3_dev/preprocessing/normalizations/inputs/qn_exp_lambda_large.txt
+decouple_cloud: false
+aggressive_pruning: false
+strato_lev_qc: 30
+strato_lev_qinput: 22
+strato_lev_tinput: -1
+strato_lev_out: 12
+input_clip: true
+input_clip_rhonly: true
+seed: 43
+restart_path: ''
+save_path: /global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging/pao_model_conf_loss/
+expname: pao_model_conf_loss_debug
+num_workers: 32
+batch_size: 1024
+epochs: 24
+learning_rate: 0.0001
+save_top_ckpts: 15
+top_ckpt_mode: min
+optimizer: AdamW
+loss: Huber
+scheduler_name: step
+scheduler:
+  step:
+    step_size: 3
+    gamma: 0.05
+  plateau:
+    patience: 2
+    factor: 0.1
+  cosine:
+    T_max: 2
+    eta_min: 1.0e-05
+  cosine_warmup:
+    T_0: 5
+    T_mult: 1
+    eta_min: 1.5e-06
+scheduler_warmup:
+  enable: false
+  warmup_steps: 20
+  warmup_strategy: cos
+  init_lr: 1.0e-07
+early_stop_step: -1
+logger: wandb
+wandb:
+  project: climsim3_debugging
+  entity: cbrain
+loc_embedding: false
+embedding_type: positional
+hidden_profile_num: 160
+hidden_scalar_num: 160
