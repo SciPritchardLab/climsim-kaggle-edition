@@ -2,7 +2,7 @@
 #SBATCH -A m4334
 #SBATCH -C gpu
 #SBATCH -q shared
-#SBATCH -t 20:00
+#SBATCH -t 40:00
 #SBATCH -n 1
 #SBATCH -c 32
 #SBATCH --image=nvcr.io/nvidia/modulus/modulus:24.01
