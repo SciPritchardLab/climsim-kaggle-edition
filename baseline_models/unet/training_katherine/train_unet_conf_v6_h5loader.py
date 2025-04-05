@@ -19,7 +19,7 @@ from modulus.launch.logging import (
 from climsim_utils.data_utils import *
 
 from climsim_datasets import TrainingDataset, ValidationDataset
-from unet import ConfUnet
+from conf_unet import ConfUnet
 from wrap_model import WrappedModel
 import hydra
 from torch.nn.parallel import DistributedDataParallel
