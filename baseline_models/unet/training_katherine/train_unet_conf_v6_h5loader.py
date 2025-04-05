@@ -19,7 +19,7 @@ from modulus.launch.logging import (
 from climsim_utils.data_utils import *
 
 from climsim_datasets import TrainingDataset, ValidationDataset
-from unet import Unet
+from unet import ConfUnet
 from wrap_model import WrappedModel
 import hydra
 from torch.nn.parallel import DistributedDataParallel
@@ -27,6 +27,7 @@ from modulus.distributed import DistributedManager
 from torch.utils.data.distributed import DistributedSampler
 import os, gc
 import random
+from custom_losses import MSELoss_conf, L1Loss_conf, SmoothL1Loss_conf
 
 @hydra.main(version_base="1.2", config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> float:
@@ -72,6 +73,8 @@ def main(cfg: DictConfig) -> float:
         data.set_to_v3_vars()
     elif cfg.variable_subsets == 'v4':
         data.set_to_v4_vars()
+    elif cfg.variable_subsets == 'v6':
+        data.set_to_v6_vars()
     else:
         raise ValueError('Unknown variable subset')
 
@@ -152,7 +155,7 @@ def main(cfg: DictConfig) -> float:
     attn_resolutions = OmegaConf.to_container(cfg.attn_resolutions, resolve = True)
     channel_mult = OmegaConf.to_container(cfg.channel_mult, resolve = True)
     resample_filter = OmegaConf.to_container(cfg.resample_filter, resolve = True)
-    model = Unet(
+    model = ConfUnet(
         input_profile_num = data.input_profile_num,
         input_scalar_num = data.input_scalar_num,
         target_profile_num = data.target_profile_num,
@@ -228,16 +231,16 @@ def main(cfg: DictConfig) -> float:
     else:
         raise ValueError('Scheduler not implemented')
     
-    # create loss function
-    if cfg.loss == 'MSE':
-        loss_fn = nn.MSELoss()
+
+    if cfg.loss == 'mse':
+        criterion_conf = MSELoss_conf()
         criterion = nn.MSELoss()
-    elif cfg.loss == 'L1':
-        loss_fn = nn.L1Loss()
+    elif cfg.loss == 'mae':
+        criterion_conf = L1Loss_conf()
         criterion = nn.L1Loss()
-    elif cfg.loss == 'Huber':
-        loss_fn = nn.HuberLoss()
-        criterion = nn.HuberLoss()
+    elif cfg.loss == 'huber':
+        criterion_conf = SmoothL1Loss_conf()
+        criterion = nn.SmoothL1Loss()
     else:
         raise ValueError('Loss function not implemented')
     
@@ -308,8 +311,8 @@ def main(cfg: DictConfig) -> float:
         # cuda_graph_warmup=11,
     )
     def training_step(model, data_input, target):
-        output = model(data_input)
-        loss = criterion(output, target)
+        pred_output, conf_output = model(data_input)
+        loss = criterion_conf(output, target)
         return loss
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
@@ -412,7 +415,7 @@ def main(cfg: DictConfig) -> float:
                 # Move data to the device
                 data_input, target = data_input.to(device), target.to(device)
 
-                output = eval_step_forward(model, data_input)
+                pred_output, conf_output = eval_step_forward(model, data_input)
                 loss = criterion(output, target)
                 val_loss += loss.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
@@ -421,7 +424,7 @@ def main(cfg: DictConfig) -> float:
                 current_val_loss_avg = val_loss / num_samples_processed
                 val_loop.set_postfix(loss=current_val_loss_avg)
                 current_step += 1
-                del data_input, target, output
+                del data_input, target, pred_output, conf_output
                     
             
             # if dist.rank == 0:

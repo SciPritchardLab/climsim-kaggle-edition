@@ -43,7 +43,7 @@
 climsim_path: '/global/cfs/cdirs/m4334/jerry/climsim3_dev/'
 
 #data_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full_processed/'
-data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_processed/'
+data_path: '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/preprocessing/v6/'
 
 #data_path_climsim_val: '/pscratch/sd/z/zeyuanhu/hugging/E3SM-MMF_ne4/preprocessing/v2_rh_mc_full_processed/'
 #data_path_dagger_val: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/preprocessing/dagger2_exp1_iter1_alphap5/ens013/'
@@ -58,13 +58,13 @@ train_input: 'train_input.npy'
 train_target: 'train_target.npy'
 val_input: 'val_input.npy'
 val_target: 'val_target.npy'
-variable_subsets: 'v2_rh_mc'
+variable_subsets: 'v6'
 qinput_log: False
 restart_path: ''
 classifier_ckpt_path: '/global/homes/z/zeyuanhu/scratch/hugging/E3SM-MMF_ne4/saved_models/v4_unet_classifier_baseline_lr5e-4/ckpt/ckpt_epoch_33_metric_0.0461.mdlus'
 #save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_allhands/'
 save_path: '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/'
-expname: 'unet_adamW_debugging'
+expname: 'unet_adamW_v6_debugging'
 
 qinput_prune: True
 qoutput_prune: True
