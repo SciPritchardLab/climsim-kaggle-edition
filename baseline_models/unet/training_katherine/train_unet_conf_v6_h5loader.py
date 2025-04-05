@@ -91,13 +91,7 @@ def main(cfg: DictConfig) -> float:
                                     output_prune = cfg.output_prune,
                                     strato_lev = cfg.strato_lev,
                                     qn_lbd = qn_lbd,
-                                    decouple_cloud = cfg.decouple_cloud,
-                                    aggressive_pruning = cfg.aggressive_pruning,
-                                    strato_lev_qc = cfg.strato_lev_qc,
-                                    strato_lev_qinput = cfg.strato_lev_qinput,
-                                    strato_lev_tinput = cfg.strato_lev_tinput,
                                     strato_lev_out = cfg.strato_lev_out,
-                                    input_clip = cfg.input_clip,
                                     input_clip_rhonly = cfg.input_clip_rhonly)
             
     train_sampler = DistributedSampler(train_dataset, seed = cfg.seed) if dist.distributed else None
@@ -119,13 +113,7 @@ def main(cfg: DictConfig) -> float:
                                     output_prune = cfg.output_prune,
                                     strato_lev = cfg.strato_lev,
                                     qn_lbd = qn_lbd,
-                                    decouple_cloud = cfg.decouple_cloud,
-                                    aggressive_pruning = cfg.aggressive_pruning,
-                                    strato_lev_qc = cfg.strato_lev_qc,
-                                    strato_lev_qinput = cfg.strato_lev_qinput,
-                                    strato_lev_tinput = cfg.strato_lev_tinput,
                                     strato_lev_out = cfg.strato_lev_out,
-                                    input_clip = cfg.input_clip,
                                     input_clip_rhonly = cfg.input_clip_rhonly)
 
     #train_sampler = DistributedSampler(train_dataset) if dist.distributed else None
@@ -232,17 +220,18 @@ def main(cfg: DictConfig) -> float:
         raise ValueError('Scheduler not implemented')
     
 
-    if cfg.loss == 'mse':
+    if cfg.loss == 'MSE':
         criterion_conf = MSELoss_conf()
         criterion = nn.MSELoss()
-    elif cfg.loss == 'mae':
+    elif cfg.loss == 'MAE':
         criterion_conf = L1Loss_conf()
         criterion = nn.L1Loss()
-    elif cfg.loss == 'huber':
+    elif cfg.loss == 'Huber':
         criterion_conf = SmoothL1Loss_conf()
         criterion = nn.SmoothL1Loss()
     else:
         raise ValueError('Loss function not implemented')
+    
     
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
