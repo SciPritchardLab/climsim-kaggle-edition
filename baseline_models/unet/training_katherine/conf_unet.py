@@ -60,7 +60,7 @@ class ConfUnet(modulus.Module):
             resample_filter: List[int] = [1, 1],
             ):
         
-        super().__init__(meta=UnetMetaData())
+        super().__init__(meta=ConfUnetMetaData())
         # check if hidden_dims is a list of hidden_dims
         self.input_profile_num = input_profile_num
         self.input_scalar_num = input_scalar_num
