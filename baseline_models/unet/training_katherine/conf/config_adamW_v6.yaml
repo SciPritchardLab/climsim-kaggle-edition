@@ -67,7 +67,7 @@ seed: 43
 restart_path: ''
 #save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging_v6/unet/'
 save_path: '/pscratch/sd/k/kfrields/hugging/E3SM-MMF_saved_models/v6_unet_adamW_conf/'
-expname: 'unet_conf_seed_43'
+expname: 'unet_adamW_conf_43'
 num_workers: 32
 batch_size: 1024
 epochs: 12
