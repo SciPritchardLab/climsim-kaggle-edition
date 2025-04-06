@@ -13,12 +13,13 @@ import cartopy
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from datetime import datetime
-from climsim_utils.data_utils import *
 from moviepy.editor import *
 from sklearn.metrics import r2_score
 import psutil
 import time
 import argparse
+import sys
+sys.path.append('/global/cfs/cdirs/m4334/jerry/climsim3_dev/')
 
 def make_pressure_weights(grid_info, ps):
     pressure_grid_p1 = np.array(grid_info['P0']*grid_info['hyai'])[np.newaxis,:,np.newaxis]

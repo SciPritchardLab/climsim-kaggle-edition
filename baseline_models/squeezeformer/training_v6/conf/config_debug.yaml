@@ -66,7 +66,7 @@ input_clip_rhonly: True
 seed: 43
 restart_path: ''
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging_v6/squeezeformer/'
-expname: 'squeezeformer_debug'
+expname: 'squeezeformer_debug_wandb_check'
 num_workers: 32
 batch_size: 1024
 epochs: 24
