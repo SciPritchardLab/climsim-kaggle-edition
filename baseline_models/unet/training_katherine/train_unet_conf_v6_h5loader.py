@@ -301,7 +301,7 @@ def main(cfg: DictConfig) -> float:
     )
     def training_step(model, data_input, target):
         pred_output, conf_output = model(data_input)
-        loss = criterion_conf(output, target)
+        loss = criterion_conf(pred_output, conf_output, target)
         return loss
     @StaticCaptureEvaluateNoGrad(model=model, use_graphs=False)
     def eval_step_forward(my_model, invar):
@@ -405,7 +405,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
 
                 pred_output, conf_output = eval_step_forward(model, data_input)
-                loss = criterion(output, target)
+                loss = criterion_conf(pred_output, conf_output, target)
                 val_loss += loss.item() * data_input.size(0)
                 num_samples_processed += data_input.size(0)
 
