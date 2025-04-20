@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -A m4334
 #SBATCH -C gpu&hbm80g
-#SBATCH -q regular
-#SBATCH -t 24:00:00
+#SBATCH -q premium
+#SBATCH -t 30:00:00
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4

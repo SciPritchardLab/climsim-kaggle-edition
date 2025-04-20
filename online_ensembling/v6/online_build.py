@@ -102,8 +102,8 @@ if newcase :
    case_build_dir=f'{case_dir}/{case}/build'
    case_run_dir=f'{case_dir}/{case}/run'
    short_term_archive_root_dir=f'{case_dir}/{case}/archive'
-   os.makedirs(case_build_dir, exist_ok=True)    
-   os.makedirs(case_run_dir, exist_ok=True)    
+   os.makedirs(case_build_dir, exist_ok=True)
+   os.makedirs(case_run_dir, exist_ok=True)
    os.makedirs(short_term_archive_root_dir, exist_ok=True)    
    run_cmd(f'./xmlchange EXEROOT={case_build_dir}')
    run_cmd(f'./xmlchange RUNDIR={case_run_dir}')

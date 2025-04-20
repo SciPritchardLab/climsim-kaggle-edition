@@ -11,15 +11,12 @@ compiled_esm_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/online_runs/cl
 long_run = True
 email_address = 'jerryL9@uci.edu'
 
-case_prefixes = ['unet_seed_43', 'squeezeformer_seed_43', 'pure_resLSTM_seed_43', 'pao_model_seed_43', 'convnext_seed_43', 'encdec_lstm_seed_43']
+case_prefixes = ['unet_seed_7', 'squeezeformer_seed_43', 'pao_model_seed_7']
 
 wrapped_model_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/'
-wrapped_models = [wrapped_model_path + 'unet/unet_seed_43/wrapped_model.pt', \
-                  wrapped_model_path + 'squeezeformer/squeezeformer_seed_43/wrapped_model.pt', \
-                  wrapped_model_path + 'pure_resLSTM/pure_resLSTM_seed_43/wrapped_model.pt', \
-                  wrapped_model_path + 'pao_model/pao_model_seed_43/wrapped_model.pt', \
-                  wrapped_model_path + 'convnext/convnext_seed_43/wrapped_model.pt', \
-                  wrapped_model_path + 'encdec_lstm/encdec_lstm_seed_43/wrapped_model.pt']
+wrapped_models = [wrapped_model_path + 'unet/unet_seed_7/wrapped_model.pt', \
+                  wrapped_model_path + 'squeezeformer/squeezeformer_seed_43_part_3/wrapped_model.pt', \
+                  wrapped_model_path + 'pao_model/pao_model_seed_7/wrapped_model.pt']
 
 for case_prefix, wrapped_model in zip(case_prefixes, wrapped_models):
     if long_run:
