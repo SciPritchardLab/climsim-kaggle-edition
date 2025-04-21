@@ -16,10 +16,39 @@ def strip_tabs(tabbed_string):
    text_to_write = '\n'.join(stripped_lines)
    return text_to_write
 
-def main(case_dir, case_prefix, compiled_esm, f_torch_model, email_address = None, long_run = False):
+def get_job_time(num_months, job_minutes_per_month):
+    """
+    Multiply the num_months by job_minutes_per_month and return the result as HH:MM:SS.
+
+    Args:
+        num_months (int): A positive integer.
+        job_minutes_per_month (int): Number of job submission minutes needed to integrate one month
+
+    Returns:
+        str: Time in the format HH:MM:SS.
+
+    Raises:
+        ValueError: If the input is not a positive integer.
+    """
+    if not isinstance(num_months, int) or num_months <= 0:
+        raise ValueError("Input must be a positive integer.")
+
+    # Calculate total seconds
+    total_seconds = num_months * job_minutes_per_month * 60
+
+    # Calculate hours, minutes, and seconds
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+
+    # Format the time as HH:MM:SS
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+def main(case_dir, case_prefix, compiled_esm, f_torch_model, num_months, job_minutes_per_month, output_frequency, email_address = None):
    newcase,config,build,clean,submit,continue_run = False,False,False,False,False,False
 
    acct = 'm4334'
+   job_time = get_job_time(num_months, job_minutes_per_month)
 
    # exe_refcase = 'ftorch_test'
    # Added extra physics_state and cam_out variables.
@@ -62,12 +91,8 @@ def main(case_dir, case_prefix, compiled_esm, f_torch_model, email_address = Non
    # compset,arch   = 'F2010-MMF1','CORI';
    # (MMF1: Note that MMF_VT is tunred off for MMF_NN_EMULATOR in $E3SMROOT/components/eam/cime_config/config_component.xml)  
 
-   if long_run:
-      queue = 'regular'
-      stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'3:00:00'
-   else:
-      queue = 'regular'
-      stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'30:00'
+   queue = 'regular'
+   stop_opt,stop_n,resub,walltime = 'nmonths', num_months, 0, job_time
 
    # case_list = [case_prefix,arch,compset,grid]
    case_list = [case_prefix, ]
@@ -99,7 +124,7 @@ def main(case_dir, case_prefix, compiled_esm, f_torch_model, email_address = Non
    #---------------------------------------------------------------------------------------------------
    if newcase :
       # case_scripts_dir=f'{case_dir}/{case}/case_scripts' 
-      case_scripts_dir=f'{case_dir}/{case}' 
+      case_scripts_dir=f'{case_dir}/{case}'
       if os.path.isdir(f'{case_dir}/{case}'): exit('\n'+clr.RED+f'This case already exists: \n{case_dir}/{case}'+clr.END+'\n')
       cmd = f'{src_dir}/cime/scripts/create_newcase -case {case} --script-root {case_scripts_dir} -compset {compset} -res {grid}  '
       if arch=='GNUCPU' : cmd += f' -mach pm-cpu -compiler gnu    -pecount {atm_ntasks}x{atm_nthrds} '
@@ -169,28 +194,43 @@ def main(case_dir, case_prefix, compiled_esm, f_torch_model, email_address = Non
 
             '''
          _myfile.write(strip_tabs(update_string))
-      if long_run:
-         update_string = '''
-         &cam_history_nl
-         fincl1 = 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-         fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-         avgflag_pertape = 'A','A'
-         nhtfrq = 0,-24
-         mfilt  = 0,1
-         /
-         '''
-      else:
-         update_string = '''
-         &cam_history_nl
-         fincl1 = 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS', 'CLDICE', 'CLDLIQ'
-         fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-         fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-         avgflag_pertape = 'A','A','I'
-         nhtfrq = 0,-24,-1
-         mfilt  = 0,1,1
-         /
-         '''
+
+      update_string_monthly = '''
+      &cam_history_nl
+      fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+      avgflag_pertape = 'A'
+      nhtfrq = 0
+      mfilt  = 0
+      /
+      '''
+      update_string_daily = '''
+      &cam_history_nl
+      fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+      fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+      avgflag_pertape = 'A','A'
+      nhtfrq = 0,-24
+      mfilt  = 0,1
+      /
+      '''
+      update_string_hourly = '''
+      &cam_history_nl
+      fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+      fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+      fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+      avgflag_pertape = 'A','A','I'
+      nhtfrq = 0,-24,-1
+      mfilt  = 0,1,1
+      /
+      '''
       with open("user_nl_eam", "a") as _myfile:
+         if output_frequency == 'monthly':
+            _myfile.write(strip_tabs(update_string_monthly))
+         elif output_frequency == 'daily':
+            _myfile.write(strip_tabs(update_string_daily))
+         elif output_frequency == 'hourly':
+            _myfile.write(strip_tabs(update_string_hourly))
+         else:
+            raise ValueError("Invalid output frequency. Choose from 'monthly', 'daily', or 'hourly'.")
          _myfile.write(strip_tabs(update_string))
    #---------------------------------------------------------------------------------------------------
    # Copy source code modification
@@ -247,19 +287,26 @@ if __name__ == '__main__':
    parser.add_argument('--case_prefix', type=str, required = True, help='Subfolder for this particular model.')
    parser.add_argument('--compiled_esm', type=str, required = True, help='Path to the compiled ESM.')
    parser.add_argument('--f_torch_model', type=str, required = True, help='Path to the PyTorch model.')
-   parser.add_argument('--long_run', action='store_true', help='Run the model for 1 simulation year.')
+   parser.add_argument('--num_months', type=int, required = True, help='Number of months to run.')
+   parser.add_argument('--job_minutes_per_month', type=int, required = True, help='Number of simulation minutes to integrate one month.')
+   parser.add_argument('--output_frequency', type=str, required = True, help='Frequency of output files (monthly, daily, hourly). Hourly values are instantaneous while others are averaged.')
    parser.add_argument('--email_address', type=str, required = False, help='Email address for job notifications.')
+
    args = parser.parse_args()
    print(f'case dir: {args.case_dir}')
    print(f'case prefix: {args.case_prefix}')
    print(f'compiled esm: {args.compiled_esm}')
    print(f'f_torch_model: {args.f_torch_model}')
+   print(f'num_months: {args.num_months}')
+   print(f'job_minutes_per_month: {args.job_minutes_per_month}')
+   print(f'output_frequency: {args.output_frequency}')
    print(f'email address: {args.email_address}')
-   print(f'long run: {args.long_run}')
 
    main(case_dir = args.case_dir,
         case_prefix = args.case_prefix,
         compiled_esm = args.compiled_esm,
         f_torch_model = args.f_torch_model,
-        email_address = args.email_address,
-        long_run = args.long_run)
+        num_months = args.num_months,
+        job_minutes_per_month = args.job_minutes_per_month,
+        output_frequency = args.output_frequency,   
+        email_address = args.email_address)

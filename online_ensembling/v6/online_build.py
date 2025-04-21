@@ -18,7 +18,7 @@ case_prefix = 'empty_case'
 
 top_dir  = os.getenv('HOME')
 scratch_dir = os.getenv('SCRATCH')
-case_dir = f'{scratch_dir}/hugging/E3SM-MMF_ne4/online_runs/ensemble_debugging'
+case_dir = f'{scratch_dir}/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_v6'
 src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 # user_cpp = '-DMMF_ML_TRAINING' # for saving ML variables
 # user_cpp = '-DMMF_NN_EMULATOR -DMMF_NN_EMULATOR_DIAG_PARTIAL -DMMF_NN_EMULATORDEBUG -DTORCH_MMF_NN_EMULATOR_TEST' # NN hybrid test
@@ -67,7 +67,7 @@ if debug_mode: case_list.append('debug')
 case='.'.join(case_list)
 #---------------------------------------------------------------------------------------------------
 # MMF_NN_EMULATOR
-f_torch_model = '/global/cfs/cdirs/m4334/jerry/ensemble_debugging/wrapped_unet.pt'
+f_torch_model = ''
 
 cb_spinup_step = 5
 f_cb_strato_water_constraint = '.true.'
@@ -102,8 +102,8 @@ if newcase :
    case_build_dir=f'{case_dir}/{case}/build'
    case_run_dir=f'{case_dir}/{case}/run'
    short_term_archive_root_dir=f'{case_dir}/{case}/archive'
-   os.makedirs(case_build_dir, exist_ok=True)    
-   os.makedirs(case_run_dir, exist_ok=True)    
+   os.makedirs(case_build_dir, exist_ok=True)
+   os.makedirs(case_run_dir, exist_ok=True)
    os.makedirs(short_term_archive_root_dir, exist_ok=True)    
    run_cmd(f'./xmlchange EXEROOT={case_build_dir}')
    run_cmd(f'./xmlchange RUNDIR={case_run_dir}')
@@ -141,9 +141,9 @@ do_aerosol_rad = .false.
 /
 
 &mmf_nn_emulator_nl
-inputlength     = 557
+inputlength     = 1519
 outputlength    = 368
-cb_nn_var_combo = 'v2'
+cb_nn_var_combo = 'v6'
 input_rh        = .true.
 cb_torch_model  = '{f_torch_model}'
 cb_spinup_step = {cb_spinup_step}

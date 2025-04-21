@@ -71,7 +71,7 @@ input_clip_rhonly: True
 # training settings
 seed: 43
 restart_path: ''
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles/pao_model/'
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_good/pao_model/'
 expname: 'pao_model_seed_43'
 num_workers: 32
 batch_size: 1024
@@ -104,7 +104,7 @@ scheduler_warmup:
 early_stop_step: -1
 logger: 'wandb'
 wandb:
-   project: "climsim3_ensembles"
+   project: "climsim3_ensembles_good"
    entity: "cbrain"
 
 # model hyperparameters
