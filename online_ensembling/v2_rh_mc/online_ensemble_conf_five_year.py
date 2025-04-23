@@ -6,7 +6,7 @@ import textwrap
 # copy online_ensemble_template.sh to online_ensemble.sh
 model_ensemble = 'five_year_runs'
 num_months = 61
-job_minutes_per_month = 10 # estimate of 10 minutes to simulate 1 month, can change for more expensive models
+job_minutes_per_month = 8 # estimate of 8 minutes to simulate 1 month, can change for more expensive models
 output_frequency = 'monthly'
 ensemble_dir = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_good/conf'
 case_dir = f'{ensemble_dir}/{model_ensemble}'
