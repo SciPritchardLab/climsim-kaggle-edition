@@ -65,17 +65,16 @@ input_clip_rhonly: True
 # training settings
 seed: 43
 restart_path: ''
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging_v6/pao_model/'
-expname: 'pao_model_debug'
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging/pao_model_v6/'
+expname: 'pao_model_v6_debug'
 num_workers: 32
 batch_size: 1024
 epochs: 24
 learning_rate: 0.0001
 save_top_ckpts: 15
 top_ckpt_mode: 'min'
-optimizer: 'Adam'
+optimizer: 'AdamW'
 loss: 'Huber'
-use_amp: True
 scheduler_name: 'step'
 scheduler:
    step:
@@ -99,7 +98,7 @@ scheduler_warmup:
 early_stop_step: -1
 logger: 'wandb'
 wandb:
-   project: "climsim3_debugging_v6"
+   project: "climsim3_debugging"
    entity: "cbrain"
 
 # model hyperparameters

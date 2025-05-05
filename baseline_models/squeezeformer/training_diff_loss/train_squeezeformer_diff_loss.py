@@ -212,17 +212,28 @@ def main(cfg: DictConfig) -> float:
     
     # create loss function
     if cfg.loss == 'MSE':
-        loss_fn = nn.MSELoss()
         criterion = nn.MSELoss()
     elif cfg.loss == 'L1':
-        loss_fn = nn.L1Loss()
         criterion = nn.L1Loss()
     elif cfg.loss == 'Huber':
-        loss_fn = nn.HuberLoss()
         criterion = nn.HuberLoss()
     else:
         raise ValueError('Loss function not implemented')
     
+    def diff_loss(output, target):
+        # Calculate the difference between output and target
+        loss = criterion(output, target)
+        output_profile = output[:, :data.target_profile_num * 60]
+        target_profile = target[:, :data.target_profile_num * 60]
+        # Reshape the output and target to have shape (batch_size, target_profile_num, 60)
+        output_profile = output_profile.reshape(-1, data.target_profile_num, 60)
+        target_profile = target_profile.reshape(-1, data.target_profile_num, 60)
+        # Calculate the difference
+        output_diff = torch.diff(output_profile, dim = 2)
+        target_diff = torch.diff(target_profile, dim = 2)
+        loss += criterion(output_diff, target_diff)
+        return loss
+
     # Initialize the console logger
     logger = PythonLogger("main")  # General python logger
 
@@ -344,7 +355,7 @@ def main(cfg: DictConfig) -> float:
                 data_input, target = data_input.to(device), target.to(device)
                 optimizer.zero_grad() # Clear gradients first
                 output = model(data_input) # Forward pass
-                loss = criterion(output, target) # Calculate loss
+                loss = diff_loss(output, target) # Calculate loss
                 loss.backward() # Backward pass
                 optimizer.step() # Update weights
                 # optimizer.zero_grad()
