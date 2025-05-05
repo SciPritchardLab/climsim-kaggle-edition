@@ -13,7 +13,7 @@
 ##SBATCH --output=out_%j.out
 ##SBATCH --error=eo_%j.err
 
-cmd="python train_encdec_lstm.py --config-name=config_seed_1024"
+cmd="python train_encdec_lstm_diff_loss.py --config-name=config_seed_1024"
 
 cd ..
 srun -n $SLURM_NTASKS shifter bash -c "source ddp_export.sh && $cmd"

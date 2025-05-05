@@ -146,17 +146,6 @@ class data_utils:
                               'pbuf_SOLIN',
                               'pbuf_LHFLX',
                               'pbuf_SHFLX']
-        
-        self.v1_outputs = ['ptend_t',
-                           'ptend_q0001',
-                           'cam_out_NETSW',
-                           'cam_out_FLWDS',
-                           'cam_out_PRECSC',
-                           'cam_out_PRECC',
-                           'cam_out_SOLS',
-                           'cam_out_SOLL',
-                           'cam_out_SOLSD',
-                           'cam_out_SOLLD']
 
         self.v2_inputs = ['state_t',
                           'state_q0001',
@@ -446,7 +435,18 @@ class data_utils:
                             'cam_in_SNOWHLAND',
                             'clat',
                             'slat',] 
-                
+
+        self.v1_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD']
+
         self.v2_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_q0002',
@@ -755,7 +755,7 @@ class data_utils:
         '''
         self.input_vars = self.v2_rh_inputs
         self.target_vars = self.v2_outputs
-        self.ps_index = 360
+        self.ps_index = 540
         self.full_vars = True
         self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
         self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
@@ -771,7 +771,7 @@ class data_utils:
         '''
         self.input_vars = self.v2_rh_mc_inputs
         self.target_vars = self.v2_rh_mc_outputs
-        self.ps_index = 360
+        self.ps_index = 540
         self.full_vars = False
         self.microphysics_constraint = True
         self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
