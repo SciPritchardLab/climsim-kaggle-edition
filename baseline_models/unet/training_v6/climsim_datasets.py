@@ -120,7 +120,7 @@ class TrainingDataset(Dataset):
         if self.qinput_prune:
             # x[:,60:60+self.strato_lev] = 0
             x[120:120+self.strato_lev] = 0
-        
+            
         if self.input_clip_rhonly:
             x[60:120] = np.clip(x[60:120], 0, 1.2)
 
@@ -188,7 +188,7 @@ class ValidationDataset(Dataset):
         if self.qinput_prune:
             # x[:,60:60+self.strato_lev] = 0
             x[120:120+self.strato_lev] = 0
-        
+
         if self.input_clip_rhonly:
             x[60:120] = np.clip(x[60:120], 0, 1.2)
 

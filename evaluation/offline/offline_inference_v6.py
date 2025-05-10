@@ -2,12 +2,10 @@ import numpy as np
 from sklearn.metrics import r2_score
 import torch
 import os, gc
-from climsim_utils.data_utils import *
 import modulus
 from tqdm import tqdm
 import sys
-
-sys.path.append('/global/cfs/cdirs/m4334/jerry/climsim3_dev/baseline_models/pao_model/training_v6/')
+from climsim_utils.data_utils import *
 
 input_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v6/scoring_set/scoring_input.npy'
 target_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessing/v6/scoring_set/scoring_target.npy'
@@ -16,7 +14,7 @@ preds_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/preprocessin
 unet_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/unet/unet_seed_43/model.pt'
 squeezeformer_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/squeezeformer/squeezeformer_seed_43/model.pt'
 pure_resLSTM_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/pure_resLSTM/pure_resLSTM_seed_43/model.pt'
-pao_model_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/pao_model/pao_model_seed_43/model.mdlus'
+pao_model_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/pao_model/pao_model_seed_43/model.pt'
 convnext_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/convnext/convnext_seed_43/model.pt'
 encdec_lstm_path = '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/encdec_lstm/encdec_lstm_seed_43/model.pt'
 
@@ -116,10 +114,7 @@ assert torch_input.shape[0] % data.num_latlon == 0
 # model inference
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 for model_name in model_paths.keys():
-    if model_name == 'pao_model':
-        model = modulus.Module.from_checkpoint(model_paths['pao_model']).to(device)
-    else:
-        model = torch.jit.load(model_paths[model_name]).to(device)
+    model = torch.jit.load(model_paths[model_name]).to(device)
     model.eval()
     model_batch_pred_list = []
     batch_size = data.num_latlon

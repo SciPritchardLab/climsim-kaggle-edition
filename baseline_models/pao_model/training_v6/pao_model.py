@@ -131,12 +131,15 @@ class PaoModel(modulus.Module):
             # scale_ix += 1
             # x_diff_diff = x_diff_diff.unsqueeze(-1)  # (batch, 60, 1)
             # dim_profile.append(x_diff_diff)
-
-        x = torch.cat(dim_profile, dim=2)  # (batch, 60, self.input_profile_num)
+        # x = torch.cat(dim_profile, dim=2)  # (batch, 60, self.input_profile_num)
+        x = torch.stack(dim_profile, dim=3) # Stack along a new dimension (dimension 3)
+        x = x.permute(0, 1, 3, 2).contiguous() # Permute to get the desired shape (might need adjustment)
+        x = x.squeeze(-1)
         position = torch.arange(0, 60, device=x.device).unsqueeze(0).repeat(x.size(0), 1)  # (x.size(0)->batch, 60)
         position = self.positional_encoding(position)  # (batch, 60, 128)
         x = self.input_linear(x)  # (batch, profile_len, 128)
         x = x + position
+
         # other cols
         scalar_x = scalar_inputs  # (batch, 19)
         scalar_x = self.other_feats_mlp(scalar_x)  # (batch, hidden)

@@ -65,15 +65,15 @@ input_clip_rhonly: True
 # training settings
 seed: 2025
 restart_path: ''
-save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_v6/convnext/'
-expname: 'convnext_seed_2025'
+save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_good/convnext_v6/'
+expname: 'convnext_v6_seed_2025'
 num_workers: 32
 batch_size: 1024
 epochs: 12
 learning_rate: 0.0001
 save_top_ckpts: 15
 top_ckpt_mode: 'min'
-optimizer: 'Adam'
+optimizer: 'AdamW'
 loss: 'Huber'
 scheduler_name: 'step'
 scheduler:
@@ -98,7 +98,7 @@ scheduler_warmup:
 early_stop_step: -1
 logger: 'wandb'
 wandb:
-   project: "climsim3_ensembles_v6"
+   project: "climsim3_ensembles_good"
    entity: "cbrain"
 
 # model hyperparameters

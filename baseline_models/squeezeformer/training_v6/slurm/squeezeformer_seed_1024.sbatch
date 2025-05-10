@@ -2,7 +2,7 @@
 #SBATCH -A m4334
 #SBATCH -C gpu&hbm80g
 #SBATCH -q premium
-#SBATCH -t 46:00:00
+#SBATCH -t 37:00:00
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4

@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -A m4334
 #SBATCH -C gpu&hbm80g
-#SBATCH -q premium
-#SBATCH -t 50:00
+#SBATCH -q debug
+#SBATCH -t 30:00
 #SBATCH -n 1
 #SBATCH -c 32
 #SBATCH --image=nvcr.io/nvidia/modulus/modulus:24.01
