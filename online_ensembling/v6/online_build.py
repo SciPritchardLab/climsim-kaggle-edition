@@ -12,13 +12,13 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'empty_case'
+case_prefix = 'empty_case_v6'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
 top_dir  = os.getenv('HOME')
 scratch_dir = os.getenv('SCRATCH')
-case_dir = f'{scratch_dir}/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_v6'
+case_dir = f'{scratch_dir}/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_good'
 src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 # user_cpp = '-DMMF_ML_TRAINING' # for saving ML variables
 # user_cpp = '-DMMF_NN_EMULATOR -DMMF_NN_EMULATOR_DIAG_PARTIAL -DMMF_NN_EMULATORDEBUG -DTORCH_MMF_NN_EMULATOR_TEST' # NN hybrid test
@@ -159,7 +159,7 @@ cb_use_cuda = {cb_use_cuda}
 /
 
 &cam_history_nl
-fincl1 = 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
 fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
 avgflag_pertape = 'A','A'
 nhtfrq = 0,-24

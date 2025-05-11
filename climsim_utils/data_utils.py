@@ -1335,6 +1335,62 @@ class data_utils:
             np.savetxt(save_path + '/out_scale.txt', out_scale.reshape(1, -1), fmt=fmt, delimiter=',')
         return input_sub, input_div, out_scale
 
+    def save_norm_multirep(self, 
+                           per_lev_sub,
+                           per_lev_div,
+                           per_col_sub,
+                           per_col_div,
+                           per_lev_min_norm,
+                           save_path = '',
+                           write=False):
+        # calculate norms for input first
+        input_sub_per_lev  = []
+        input_div_per_lev  = []
+        input_sub_per_col = []
+        input_div_per_col = []
+        input_min_norm_per_lev = []
+        fmt = '%.6e'
+        for var in self.input_vars:
+            var_lev = self.var_lens[var]
+            if var_lev == 1:
+                input_sub_per_lev.append(per_lev_sub[var].values)
+                input_div_per_lev.append(per_lev_div[var].values)
+            else:
+                for i in range(var_lev):
+                    input_sub_per_lev.append(per_lev_sub[var].values[i])
+                    input_div_per_lev.append(per_lev_div[var].values[i])
+        for var in self.input_vars:
+            var_lev = self.var_lens[var]
+            if var != 'liq_partition' and var_lev == 60:
+                for i in range(var_lev):
+                    input_sub_per_col.append(per_col_sub[var].values[i])
+                    input_div_per_col.append(per_col_div[var].values[i])
+                    input_min_norm_per_lev.append(per_lev_min_norm[var].values[i])
+        input_sub_per_lev = np.array(input_sub_per_lev)
+        input_div_per_lev = np.array(input_div_per_lev)
+        input_sub_per_col = np.array(input_sub_per_col)
+        input_div_per_col = np.array(input_div_per_col)
+        input_min_norm_per_lev = np.array(input_min_norm_per_lev)
+        if write:
+            np.savetxt(save_path + '/inp_sub_per_lev.txt', input_sub_per_lev.reshape(1, -1), fmt=fmt, delimiter=',')
+            np.savetxt(save_path + '/inp_div_per_lev.txt', input_div_per_lev.reshape(1, -1), fmt=fmt, delimiter=',')
+            np.savetxt(save_path + '/inp_sub_per_col.txt', input_sub_per_col.reshape(1, -1), fmt=fmt, delimiter=',')
+            np.savetxt(save_path + '/inp_div_per_col.txt', input_div_per_col.reshape(1, -1), fmt=fmt, delimiter=',')
+            np.savetxt(save_path + '/inp_min_norm_per_lev.txt', input_min_norm_per_lev.reshape(1, -1), fmt=fmt, delimiter=',')
+        # calculate norms for target
+        out_scale = []
+        for var in self.target_vars:
+            var_lev = self.var_lens[var]
+            if var_lev == 1:
+                out_scale.append(self.output_scale[var].values)
+            else:
+                for i in range(var_lev):
+                    out_scale.append(self.output_scale[var].values[i])
+        out_scale = np.array(out_scale)
+        if write:
+            np.savetxt(save_path + '/out_scale.txt', out_scale.reshape(1, -1), fmt=fmt, delimiter=',')
+        return input_sub_per_lev, input_div_per_lev, input_sub_per_col, input_div_per_col, input_min_norm_per_lev, out_scale
+
     @staticmethod
     def ls(dir_path = ''):
         '''
