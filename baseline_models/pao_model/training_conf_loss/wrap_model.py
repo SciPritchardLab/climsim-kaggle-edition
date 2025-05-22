@@ -93,4 +93,5 @@ class WrappedModel(nn.Module):
         xout[:,240:] = x[:,180:]
         xout[:,120:180] = (qc_new - qc_before)/1200.
         xout[:,180:240] = (qi_new - qi_before)/1200.
+        xout = torch.cat((xout, conf), dim=1)
         return xout

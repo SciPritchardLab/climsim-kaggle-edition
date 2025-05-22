@@ -10,7 +10,7 @@ job_minutes_per_month = 8 # estimate of 8 minutes to simulate 1 month, can chang
 output_frequency = 'hourly'
 ensemble_dir = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_good/conf'
 case_dir = f'{ensemble_dir}/{model_ensemble}'
-compiled_esm_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_good/empty_case/build/e3sm.exe'
+compiled_esm_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_good/empty_case_conf/build/e3sm.exe'
 email_address = 'jerryL9@uci.edu'
 
 case_prefixes = ['unet_conf_seed_7', \
@@ -28,9 +28,9 @@ case_prefixes = ['unet_conf_seed_7', \
                  'convnext_conf_seed_7', \
                  'convnext_conf_seed_43', \
                  'convnext_conf_seed_1024', \
-                 'encdec_conf_lstm_seed_7', \
-                 'encdec_conf_lstm_seed_43', \
-                 'encdec_conf_lstm_seed_1024']
+                 'encdec_lstm_conf_seed_7', \
+                 'encdec_lstm_conf_seed_43', \
+                 'encdec_lstm_conf_seed_1024']
 
 wrapped_model_path = '/pscratch/sd/j/jerrylin/hugging/E3SM-MMF_ne4/saved_models/climsim3_ensembles_good/'
 wrapped_models = [wrapped_model_path + 'unet_conf/unet_conf_seed_7/wrapped_model.pt', \
@@ -54,7 +54,7 @@ wrapped_models = [wrapped_model_path + 'unet_conf/unet_conf_seed_7/wrapped_model
 
 for case_prefix, wrapped_model in zip(case_prefixes, wrapped_models):
     run_string = f'''
-    python online_run.py \\
+    python online_run_conf.py \\
             --case_dir {case_dir} \\
             --case_prefix {case_prefix} \\
             --compiled_esm {compiled_esm_path} \\

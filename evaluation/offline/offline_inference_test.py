@@ -225,7 +225,7 @@ def preprocessing_multirep(data,
     x2 = (np.concatenate([npy_input[:,:180], npy_input[:,240:540]], axis = 1) - input_sub_per_col)/input_div_per_col
     x2 = np.where(np.isnan(x2), 0, x2)
     x2 = np.where(np.isinf(x2), 0, x2)
-    x_col_norm = np.concatenate([npy_input[:,:180], npy_input[:,240:540]], axis=1)
+    x_col_norm = np.concatenate([x1[:,:180], x1[:,240:540]], axis=1)
     x3 = np.where(x_col_norm >= input_min_norm_per_lev, \
                   np.log((x_col_norm - input_min_norm_per_lev) + 1), \
                   -np.log((input_min_norm_per_lev - x_col_norm) + 1))
