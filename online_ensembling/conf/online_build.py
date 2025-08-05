@@ -12,7 +12,7 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'empty_case'
+case_prefix = 'empty_case_conf'
 # exe_refcase = 'ftorch_test'
 # Added extra physics_state and cam_out variables.
 
@@ -26,8 +26,7 @@ user_cpp = '-DMMF_NN_EMULATOR' # NN hybrid test
 # # src_mod_atm_dir = '/global/homes/s/sungduk/repositories/ClimSim-E3SM-Hybrid/'
 ftorch_path = '/global/cfs/cdirs/m4334/shared/FTorch/src/install'
 os.environ["FTorch_ROOT"] = ftorch_path
-os.environ["NVCC_WRAPPER_DEFAULT_OPTIONS"] = "-arch=sm_80"
-os.environ["KOKKOS_NVCC_FLAGS"] = "-arch=sm_80"
+
 # RESTART
 runtype = 'branch' # startup, hybrid,  branch
 refdate = '0002-12-30' # only works for branch (and hybrid?)
@@ -143,8 +142,8 @@ do_aerosol_rad = .false.
 
 &mmf_nn_emulator_nl
 inputlength     = 557
-outputlength    = 368
-cb_nn_var_combo = 'v2'
+outputlength    = 676
+cb_nn_var_combo = 'v2_conf'
 input_rh        = .true.
 cb_torch_model  = '{f_torch_model}'
 cb_spinup_step = {cb_spinup_step}
@@ -160,8 +159,8 @@ cb_use_cuda = {cb_use_cuda}
 /
 
 &cam_history_nl
-fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS', 'DTPHYSCONF', 'DQ1PHYSCONF', 'DQNPHYSCONF', 'DUPHYSCONF'
+fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS', 'DTPHYSCONF', 'DQ1PHYSCONF', 'DQNPHYSCONF', 'DUPHYSCONF'
 avgflag_pertape = 'A','A'
 nhtfrq = 0,-24
 mfilt  = 0,1

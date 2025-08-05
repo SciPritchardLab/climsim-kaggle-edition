@@ -12,8 +12,8 @@ newcase,config,build,clean,submit,continue_run = False,False,False,False,False,F
 
 acct = 'm4334'
 
-case_prefix = 'empty_case'
-# exe_refcase = 'ftorch_test'
+case_prefix = 'MMF_high_frequency'
+# exe_refcase = ''
 # Added extra physics_state and cam_out variables.
 
 top_dir  = os.getenv('HOME')
@@ -22,12 +22,11 @@ case_dir = f'{scratch_dir}/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_g
 src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 # user_cpp = '-DMMF_ML_TRAINING' # for saving ML variables
 # user_cpp = '-DMMF_NN_EMULATOR -DMMF_NN_EMULATOR_DIAG_PARTIAL -DMMF_NN_EMULATORDEBUG -DTORCH_MMF_NN_EMULATOR_TEST' # NN hybrid test
-user_cpp = '-DMMF_NN_EMULATOR' # NN hybrid test
+user_cpp = '' # do MMF
 # # src_mod_atm_dir = '/global/homes/s/sungduk/repositories/ClimSim-E3SM-Hybrid/'
 ftorch_path = '/global/cfs/cdirs/m4334/shared/FTorch/src/install'
 os.environ["FTorch_ROOT"] = ftorch_path
-os.environ["NVCC_WRAPPER_DEFAULT_OPTIONS"] = "-arch=sm_80"
-os.environ["KOKKOS_NVCC_FLAGS"] = "-arch=sm_80"
+
 # RESTART
 runtype = 'branch' # startup, hybrid,  branch
 refdate = '0002-12-30' # only works for branch (and hybrid?)
@@ -45,20 +44,22 @@ debug_mode = False
 dtime = 1200 # set to 0 to use a default value 
 
 #stop_opt,stop_n,resub,walltime = 'nmonths',1, 1, '00:30:00'
-stop_opt,stop_n,resub,walltime = 'nmonths',13, 0,'30:00'
-#stop_opt,stop_n,resub,walltime = 'ndays',10, 0,'00:30:00'
+stop_opt,stop_n,resub,walltime = 'nmonths',6, 0,'12:00:00'
+#stop_opt,stop_n,resub,walltime = 'ndays',2, 0,'00:30:00'
 
-ne,npg=4,2;  num_nodes=2  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
+ne,npg=4,2;  num_nodes=1  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
 # ne,npg=30,2; num_nodes=32 ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
 # ne,npg=30,2; num_nodes=32 ; grid=f'ne{ne}pg{npg}_oECv3' # bi-grid for AMIP or coupled
 
 compset,arch   = 'F2010-MMF1','GNUGPU'
+# compset,arch   = 'F2010-MMF1','GNUGPU'
 # compset,arch   = 'FAQP-MMF1','GNUGPU'
 # compset,arch   = 'F2010-MMF1','CORI';
-# (MMF1: Note that MMF_VT is tunred off for MMF_NN_EMULATOR in $E3SMROOT/components/eam/cime_config/config_component.xml)  
+# (MMF1: Note that MMF_VT is tunred off for CLIMSIM in $E3SMROOT/components/eam/cime_config/config_component.xml)  
 
-# queue = 'regular'
-queue = 'debug'
+queue = 'regular'
+#queue = 'debug'
+email_address = 'jerryL9@uci.edu'
 
 # case_list = [case_prefix,arch,compset,grid]
 case_list = [case_prefix, ]
@@ -162,9 +163,10 @@ cb_use_cuda = {cb_use_cuda}
 &cam_history_nl
 fincl1 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
 fincl2 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
-avgflag_pertape = 'A','A'
-nhtfrq = 0,-24
-mfilt  = 0,1
+fincl3 = 'PRECT', 'PRECC', 'FLUT', 'CLOUD', 'CLDTOT', 'CLDLOW', 'CLDMED', 'CLDHGH', 'LWCF', 'SWCF', 'LHFLX', 'SHFLX', 'TMQ', 'U850', 'T850', 'Z850', 'U500', 'T500', 'Z500', 'T', 'Q', 'U', 'V', 'PS', 'CLDICE', 'CLDLIQ', 'DTPHYS', 'DQ1PHYS', 'DQ2PHYS', 'DQ3PHYS', 'DUPHYS'
+avgflag_pertape = 'A','A','I'
+nhtfrq = 0,-24,-1
+mfilt  = 0,1,1
 /
 
                      ''')
@@ -205,7 +207,7 @@ if submit :
    continue_flag = 'TRUE' if continue_run else 'False'
    run_cmd(f'./xmlchange --file env_run.xml CONTINUE_RUN={continue_flag} ')
    #-------------------------------------------------------
-   # run_cmd('./case.submit')
+   run_cmd(f'./case.submit --mail-user {email_address} --mail-type begin,end')
 #---------------------------------------------------------------------------------------------------
 # Print the case name again
 print(f'\n  case : {case}\n')

@@ -150,7 +150,7 @@ def main(mmf_path, nn_path, save_path, var, max_day, \
         shutil.rmtree(f'{movie_path}/{var}')
     os.makedirs(f'{movie_path}/{var}')
 
-    for hour in tqdm(range(min(672, num_hours))):
+    for hour in tqdm(range(min(1416, num_hours))):
         image_file_name = f'{movie_path}/{var}/{var}_{str(hour).zfill(5)}.png'
 
         sp_zonal = xr.DataArray(arr_sp_zonal_mean[hour,:,:].T, dims = ['level', 'lat'],
