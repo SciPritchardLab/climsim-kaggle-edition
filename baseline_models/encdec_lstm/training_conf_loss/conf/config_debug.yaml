@@ -69,7 +69,7 @@ input_clip_rhonly: True
 # and strato_lev_out is a constant value for pruning the output vector
 
 # training settings
-seed: 43
+seed: 7
 restart_path: ''
 save_path: '/global/homes/j/jerrylin/scratch/hugging/E3SM-MMF_ne4/saved_models/climsim3_debugging/encdec_lstm_conf/'
 expname: 'encdec_lstm_conf_debug'

@@ -172,7 +172,33 @@ class data_utils:
                           'cam_in_SNOWHLAND',
                           'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
                           'pbuf_CH4',
-                          'pbuf_N2O'] 
+                          'pbuf_N2O']
+
+        self.v2_kaggle_inputs = ['state_t',
+                                 'state_q0001',
+                                 'state_q0002',
+                                 'state_q0003',
+                                 'state_u',
+                                 'state_v',
+                                 'state_ps',
+                                 'pbuf_SOLIN',
+                                 'pbuf_LHFLX',
+                                 'pbuf_SHFLX',
+                                 'pbuf_TAUX',
+                                 'pbuf_TAUY',
+                                 'pbuf_COSZRS',
+                                 'cam_in_ALDIF',
+                                 'cam_in_ALDIR',
+                                 'cam_in_ASDIF',
+                                 'cam_in_ASDIR',
+                                 'cam_in_LWUP',
+                                 'cam_in_ICEFRAC',
+                                 'cam_in_LANDFRAC',
+                                 'cam_in_OCNFRAC',
+                                 'cam_in_SNOWHLAND',
+                                 'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
+                                 'pbuf_CH4',
+                                 'pbuf_N2O'] 
 
         self.v2_dyn_inputs = ['state_t',
                           'state_q0001',
@@ -434,7 +460,38 @@ class data_utils:
                             'cam_in_SNOWHICE',
                             'cam_in_SNOWHLAND',
                             'clat',
-                            'slat',] 
+                            'slat',]
+
+        self.v7_inputs = ['state_t',
+                          'state_rh',
+                          'state_qn',
+                          'liq_partition',
+                          'state_u',
+                          'state_v',
+                          'state_t_prvphy',
+                          'state_q0001_prvphy',
+                          'state_qn_prvphy',
+                          'state_u_prvphy',
+                          'pbuf_ozone', # outside of the upper troposphere lower stratosphere (UTLS, corresponding to indices 5-21), variance in minimal for these last 3 
+                          'pbuf_CH4',
+                          'pbuf_N2O',
+                          'state_ps',
+                          'pbuf_SOLIN',
+                          'pbuf_LHFLX',
+                          'pbuf_SHFLX',
+                          'pbuf_TAUX',
+                          'pbuf_TAUY',
+                          'pbuf_COSZRS',
+                          'cam_in_ALDIF',
+                          'cam_in_ALDIR',
+                          'cam_in_ASDIF',
+                          'cam_in_ASDIR',
+                          'cam_in_LWUP',
+                          'cam_in_ICEFRAC',
+                          'cam_in_LANDFRAC',
+                          'cam_in_OCNFRAC',
+                          'cam_in_SNOWHICE',
+                          'cam_in_SNOWHLAND'] 
 
         self.v1_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -461,6 +518,8 @@ class data_utils:
                            'cam_out_SOLL',
                            'cam_out_SOLSD',
                            'cam_out_SOLLD']
+                    
+        self.v2_kaggle_outputs = self.v2_outputs
         
         self.v2_rh_mc_outputs = ['ptend_t',
                            'ptend_q0001',
@@ -521,6 +580,20 @@ class data_utils:
                            'cam_out_SOLLD']
 
         self.v6_outputs = ['ptend_t',
+                           'ptend_q0001',
+                           'ptend_qn',
+                           'ptend_u',
+                           'ptend_v',
+                           'cam_out_NETSW',
+                           'cam_out_FLWDS',
+                           'cam_out_PRECSC',
+                           'cam_out_PRECC',
+                           'cam_out_SOLS',
+                           'cam_out_SOLL',
+                           'cam_out_SOLSD',
+                           'cam_out_SOLLD',]
+
+        self.v7_outputs = ['ptend_t',
                            'ptend_q0001',
                            'ptend_qn',
                            'ptend_u',
@@ -610,6 +683,10 @@ class data_utils:
                         'pbuf_SOLIN_pm':1,
                         'pbuf_COSZRS_pm':1,
                         }
+
+        self.var_names = {} # TO DO: add all variables here
+
+        self.var_units = {} # TO DO: add all variable units here
 
         self.var_short_names = {'ptend_t':'$dT/dt$',
                                 'ptend_q0001':'$dq/dt$',
@@ -748,6 +825,22 @@ class data_utils:
         self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 557
         self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
 
+    def set_to_v2_kaggle_vars(self):
+        '''
+        This function sets the inputs and outputs to the V2 kaggle subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v2_kaggle_inputs
+        self.target_vars = self.v2_kaggle_outputs
+        self.ps_index = 360
+        self.full_vars = True
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 556
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 368
+
     def set_to_v2_rh_vars(self):
         '''
         This function sets the inputs and outputs to the V2 subset.
@@ -861,6 +954,23 @@ class data_utils:
         self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
         self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
         self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 1399
+        self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 308
+
+    def set_to_v7_vars(self):
+        '''
+        This function sets the inputs and outputs to the V7 subset.
+        It also indicates the index of the surface pressure variable.
+        '''
+        self.input_vars = self.v7_inputs
+        self.target_vars = self.v7_outputs
+        self.ps_index = 780
+        self.full_vars = False
+        self.microphysics_constraint = True
+        self.input_profile_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 60)
+        self.input_scalar_num = sum(1 for input_var in self.input_vars if self.var_lens[input_var] == 1)
+        self.target_profile_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 60)
+        self.target_scalar_num = sum(1 for target_var in self.target_vars if self.var_lens[target_var] == 1)
+        self.input_feature_len = self.input_profile_num * 60 + self.input_scalar_num # 797
         self.target_feature_len = self.target_profile_num * 60 + self.target_scalar_num # 308
 
     def eliq(self, T):
@@ -1148,7 +1258,8 @@ class data_utils:
     def save_as_npy(self,
                  data_split, 
                  save_path = '',
-                 save_latlontime_dict = False):
+                 save_latlontime_dict = False,
+                 precision = 'float32'):
         '''
         This function saves the training data as a .npy file.
         '''
@@ -1167,8 +1278,10 @@ class data_utils:
         # add "/" to the end of save_path if it does not exist
         if save_path[-1] != '/':
             save_path = save_path + '/'
-
-        npy_input = np.float32(npy_input)
+        if precision == 'float32':
+            npy_input = np.float32(npy_input)
+        elif precision == 'float64':
+            npy_input = np.float64(npy_input)
         if self.save_h5:
             h5_path = save_path + data_split + '_input.h5'
             with h5py.File(h5_path, 'w') as hdf:
@@ -1437,23 +1550,31 @@ class data_utils:
         pred = np.array(hf.get('pred'))
         return pred
 
-    def zonal_bin_weight_2d(self, npy_array):
+    def zonal_bin_weight_2d(self, npy_array, custom_weighting = None):
         '''
         This function returns the zonal mean of a 2D numpy array, 
         assuming that the 0th dimension corresponds to time, 
         and the 1st dimension corresponds to the latitude bin
         '''
-        npy_array = npy_array * self.grid_info_area[None, :] * self.lat_bin_area_divs[None, :]
+        if custom_weighting is None:
+            npy_array = npy_array * self.grid_info_area[None, :] * self.lat_bin_area_divs[None, :]
+        else:
+            assert len(custom_weighting.shape) == 2
+            npy_array = npy_array * custom_weighting
         return np.stack([np.sum(npy_array[:, self.lat_bin_dict[lat_bin]], axis = 1) for lat_bin in self.lat_bin_dict.keys()], axis = 1)
 
-    def zonal_bin_weight_3d(self, npy_array):
+    def zonal_bin_weight_3d(self, npy_array, custom_weighting = None):
         '''
         This function returns the zonal mean of a 3D numpy array, 
         assuming that the 0th dimension corresponds to time, 
         the 1st dimension corresponds to the latitude bin,
         and the 2nd dimension corresponds to vertical level
         '''
-        npy_array = npy_array * self.grid_info_area[None, :, None] * self.lat_bin_area_divs[None, :, None]
+        if custom_weighting is None:
+            npy_array = npy_array * self.grid_info_area[None, :, None] * self.lat_bin_area_divs[None, :, None]
+        else:
+            assert len(custom_weighting.shape) == 3
+            npy_array = npy_array * custom_weighting
         return np.stack([np.sum(npy_array[:, self.lat_bin_dict[lat_bin], :], axis = 1) for lat_bin in self.lat_bin_dict.keys()], axis = 1)
 
     def set_pressure_grid(self, data_split):

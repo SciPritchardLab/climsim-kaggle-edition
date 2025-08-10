@@ -161,6 +161,17 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Ignore all .DS_Store files everywhere
+**/.DS_Store
+
+# Ignore all compiled Python files
+**/__pycache__/
+**/*.pyc
+
+# Ignore all .out and .err files
+**/*.err
+**/*.out
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
