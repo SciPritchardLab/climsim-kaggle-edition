@@ -22,7 +22,7 @@ case_dir = f'{scratch_dir}/hugging/E3SM-MMF_ne4/online_runs/climsim3_ensembles_g
 src_dir  = top_dir+'/nvidia_codes/E3SM_nvlab/' # branch => whannah/mmf/ml-training
 # user_cpp = '-DMMF_ML_TRAINING' # for saving ML variables
 # user_cpp = '-DMMF_NN_EMULATOR -DMMF_NN_EMULATOR_DIAG_PARTIAL -DMMF_NN_EMULATORDEBUG -DTORCH_MMF_NN_EMULATOR_TEST' # NN hybrid test
-# user_cpp = '-DMMF_NN_EMULATOR' # NN hybrid test
+user_cpp = '-DMMF_NN_EMULATOR' # NN hybrid test
 # # src_mod_atm_dir = '/global/homes/s/sungduk/repositories/ClimSim-E3SM-Hybrid/'
 # # old ftorch path below. For some reason, the install folder is located in FTorch not src.
 # ftorch_path = '/global/cfs/cdirs/m4334/shared/FTorch/src/install'
@@ -54,9 +54,9 @@ ne,npg=4,2;  num_nodes=2  ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
 # ne,npg=30,2; num_nodes=32 ; grid=f'ne{ne}pg{npg}_ne{ne}pg{npg}'
 # ne,npg=30,2; num_nodes=32 ; grid=f'ne{ne}pg{npg}_oECv3' # bi-grid for AMIP or coupled
 
-compset,arch   = 'F2010-MMF1','GNUGPU'
+# compset,arch   = 'F2010-MMF1','GNUGPU'
 # compset,arch   = 'FAQP-MMF1','GNUGPU'
-# compset,arch   = 'F2010-MMF1','CORI';
+compset,arch   = 'F2010-MMF1','GNUCPU'
 # (MMF1: Note that MMF_VT is tunred off for MMF_NN_EMULATOR in $E3SMROOT/components/eam/cime_config/config_component.xml)  
 
 # queue = 'regular'
