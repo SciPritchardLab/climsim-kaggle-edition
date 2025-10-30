@@ -5,12 +5,12 @@
 │
 ├── baseline_models           <- Pretrained baseline models, as well as python scripts and dependencies
 |                                for re-training the models 
-│   ├── CNN                      <- Convolutional Neural Network
-│   ├── ED                       <- Encoder Decoder
-│   ├── HSR                      <- Heteroskedastic Regression
-│   ├── MLP                      <- Multilayer Perceptron
-│   ├── RPN                      <- Randomized Prior Network
-│   └── cVAE                     <- Conditional Variational Autoencoder
+│   ├── convnext                 <- U-Net architecture used by Hu et al. 2025
+│   ├── ED                       <- Squeezeformer architecture used by 1st place team
+│   ├── HSR                      <- Pure ResLSTM architecture used by 2nd place team
+│   ├── MLP                      <- Custom Pao Model architecture used by 3rd place team
+│   ├── RPN                      <- Modified ConvNeXt architecture used by 4th place team
+│   └── cVAE                     <- Encoder-Decoder LSTM architecture used by 5th place team
 │
 ├── climsim_utils             <- Installable python package for data preprocessing and model evaluation
 |
