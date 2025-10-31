@@ -111,11 +111,25 @@ Online coupled simulations use FTorch for PyTorch-Fortran integration. See the [
 
 ### Evaluation
 
-Offline evaluation scripts in `evaluation/offline/` compute test set metrics. Online evaluation scripts in `evaluation/online/` analyze coupled simulation output.
+The evaluation pipeline consists of multiple phases that separate expensive computations from figure generation.
 
-For reproducing paper figures:
+**Quick Start for Paper Figures:**
 1. Run `preprocess_figure_data.ipynb` to compute expensive metrics and save results
 2. Run `generate_paper_figures.ipynb` to generate all main and supplementary figures
+
+**Detailed Workflow:**
+
+The full evaluation pipeline has 4 phases (see [ARCHITECTURE.md](ARCHITECTURE.md#evaluation-pipeline) for details):
+
+1. **Offline Inference** (`evaluation/offline/offline_inference_test.py`): Runs inference on 90 model combinations (6 models × 5 configs × 3 seeds) and saves predictions as `.npz` files and R² scores as `.pkl` files
+
+2. **Offline Diagnostics** (`evaluation/offline/create_offline_*.py`): Generates diagnostic plots from the predictions (bias profiles, zonal means, etc.)
+
+3. **Online Preprocessing** (`preprocess_figure_data.ipynb`): Loads multi-year online simulation data, computes expensive statistics (RMSE, precipitation, etc.), and saves processed results as `.pkl` files
+
+4. **Figure Generation** (`generate_paper_figures.ipynb`): Loads precomputed data and generates all publication figures
+
+This workflow design enables rapid iteration on figures without rerunning expensive inference or simulation loading steps.
 
 ## Requirements
 
