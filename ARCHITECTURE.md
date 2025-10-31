@@ -132,3 +132,104 @@ Each configuration supports multiple random seeds (7, 43, 1024) for ensemble tra
 5. **Figure Generation**:
    - Run `preprocess_figure_data.ipynb` to compute metrics
    - Run `generate_paper_figures.ipynb` to create visualizations
+
+## Evaluation Pipeline
+
+The evaluation workflow consists of multiple phases that precompute expensive metrics for efficient figure generation.
+
+### Phase 1: Offline Inference (evaluation/offline/)
+
+**Primary Script**: `offline_inference_test.py`
+
+This script performs inference on all trained models against the test set and computes R² scores.
+
+**Inputs:**
+- Trained model checkpoints for 6 models × 5 configurations × 3 seeds (90 combinations)
+- Test set input/target data from preprocessing
+- Normalization files
+
+**Outputs:**
+- **Prediction files** (`.npz`): Model predictions for each configuration/model combination
+  - Location: `/pscratch/.../test_preds/{config}/{config}_{model}_preds.npz`
+  - Format: Keys `seed_7`, `seed_43`, `seed_1024` containing prediction arrays
+  - Example: `standard_unet_preds.npz` with shape `(time, latlon, features)`
+
+- **R² score files** (`.pkl`): Precomputed R² scores for each model
+  - Location: `/pscratch/.../test_preds/{config}/{config}_{model}_r2.pkl`
+  - Used by notebooks to avoid recomputing expensive R² calculations
+
+**Purpose**: This is the most computationally expensive step - running inference on 90 model combinations and computing per-feature R² scores across the entire test set.
+
+### Phase 2: Offline Figure Generation (evaluation/offline/)
+
+**Scripts:**
+- `create_offline_binned_moistening_bias_config_comparison.py`
+- `create_offline_binned_moistening_bias_model_comparison.py`
+- `create_offline_zonal_mean_tendency_bias.py`
+- `create_offline_zonal_mean_tendency_conf.py`
+- `get_offline_bias_minmax.py`
+
+**Inputs:**
+- Prediction `.npz` files from Phase 1
+- Test set targets
+
+**Outputs:**
+- PNG figures showing offline metrics (bias profiles, zonal means, etc.)
+- Saved to `/pscratch/.../climsim3_figures/offline/`
+
+**Purpose**: These scripts load precomputed predictions and generate diagnostic plots. They do not save intermediate processed data - they are pure visualization utilities.
+
+### Phase 3: Online Data Preprocessing (preprocess_figure_data.ipynb)
+
+**Inputs:**
+- R² score `.pkl` files from Phase 1
+- Online simulation output (NetCDF files from E3SM-MMF coupled runs)
+  - Location: `/pscratch/.../online_runs/climsim3_ensembles_good/`
+  - Multi-year (4-year and 5-year) simulation data
+
+**Processing:**
+- Loads multi-year online simulation datasets
+- Computes expensive statistics:
+  - RMSE calculations across spatial/temporal dimensions
+  - Hourly precipitation statistics
+  - Multi-year averaged fields
+- Creates comparison datasets for all model/config combinations
+
+**Outputs** (saved as `.pkl` files):
+- `ds_nn_{config}_{years}_year.pkl` - Online simulation datasets (xarray)
+- `ds_nn_rmse_{config}_{years}_year.pkl` - RMSE statistics
+- `nn_hourly_prect_{config}_{years}_year.pkl` - Hourly precipitation data
+- `mmf_{ref}_rmse_{years}_year.pkl` - MMF reference simulation metrics
+
+**Purpose**: This notebook performs the expensive I/O and computation on large multi-year simulation datasets, saving the processed results for quick loading during figure generation.
+
+### Phase 4: Paper Figure Generation (generate_paper_figures.ipynb)
+
+**Inputs:**
+- All `.pkl` files from Phase 3
+- Some prediction files from Phase 1 (for specific analyses)
+
+**Outputs:**
+- All main text figures
+- All supplementary figures
+- Saved as high-resolution PNGs/PDFs
+
+**Purpose**: Loads precomputed data and generates publication-quality figures. Runs quickly since all expensive computations were done in Phases 1 and 3.
+
+### Summary of Data Flow
+
+```
+Phase 1: offline_inference_test.py
+    ↓ (saves .npz predictions + .pkl R² scores)
+
+Phase 2: create_offline_*.py
+    ↓ (loads .npz, generates offline diagnostic figures)
+
+Phase 3: preprocess_figure_data.ipynb
+    ↓ (loads R² .pkl + online NetCDF → saves processed .pkl)
+
+Phase 4: generate_paper_figures.ipynb
+    ↓ (loads all .pkl → generates paper figures)
+```
+
+**Key Insight**: The precomputing workflow separates expensive operations (model inference, multi-year simulation loading) from figure generation, enabling rapid iteration on visualizations without rerunning computationally expensive steps.
