@@ -120,7 +120,7 @@ For reproducing paper figures:
 ## Requirements
 
 - PyTorch (for training and inference)
-- [NVIDIA Modulus](https://docs.nvidia.com/deeplearning/modulus/) (used during training)
+- [NVIDIA PhysicsNeMo](https://developer.nvidia.com/physicsnemo) (originally called Modulus; used during training)
 - Hydra (configuration management)
 - Standard scientific Python stack (numpy, xarray, matplotlib, etc.)
 
