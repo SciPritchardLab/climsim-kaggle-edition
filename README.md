@@ -22,7 +22,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed structure documentation.
 ├── baseline_models/          # Model implementations and training scripts
 │   ├── convnext/             # ConvNeXt architecture
 │   ├── encdec_lstm/          # Encoder-Decoder LSTM
-│   ├── pao_model/            # PAO model (3rd place)
+│   ├── pao_model/            # Pao model (3rd place)
 │   ├── pure_resLSTM/         # Pure ResLSTM (2nd place)
 │   ├── squeezeformer/        # Squeezeformer (1st place)
 │   └── unet/                 # U-Net baseline
@@ -51,7 +51,7 @@ Integrates convolutional and transformer components. Originally designed for aut
 ### Pure ResLSTM (2nd Place)
 Multi-layer bidirectional LSTM with residual connections. Processes vertical profiles through 10 blocks of LSTM + layer normalization + GELU activation, embedding a physical prior of vertical locality.
 
-### PAO Model (3rd Place)
+### Pao Model (3rd Place)
 Processes vertically-resolved and scalar variables separately before combining. Uses residual blocks with convolutional and transformer components, followed by bidirectional LSTM layers.
 
 ### ConvNeXt (4th Place)
@@ -126,6 +126,10 @@ For reproducing paper figures:
 
 See individual model directories for specific dependencies.
 
+## Saved models
+
+Models, checkpoints, and normalization files have been uploaded to HuggingFace and are available [here](https://huggingface.co/jlin404/models).
+
 ## Citation
 
 If you use this code or build upon this work, please cite the accompanying paper (citation to be added upon publication).
@@ -135,7 +139,7 @@ If you use this code or build upon this work, please cite the accompanying paper
 - [ClimSim Kaggle Competition](https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim)
 - Hu et al. (2025). Stable Machine-Learning Parameterization of Subgrid Processes with Real Geography and Full-physics Emulation. [arXiv:2407.00124](https://arxiv.org/abs/2407.00124)
 - [ClimSim Dataset on HuggingFace](https://huggingface.co/LEAP)
-- [FTorch-based E3SM-MMF](https://github.com/zyhu-hu/E3SM_nvlab/tree/ftorch/climsim_scripts/perlmutter_scripts)
+- [FTorch-based E3SM-MMF](https://github.com/zyhu-hu/E3SM_nvlab/tree/ftorch/)
 
 ## License
 
