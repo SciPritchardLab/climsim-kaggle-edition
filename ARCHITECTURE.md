@@ -9,7 +9,7 @@
 │   │                            for 6 model architectures across 5 training configurations
 │   ├── convnext                 <- ConvNeXt model
 │   ├── encdec_lstm              <- Encoder-Decoder LSTM
-│   ├── pao_model                <- PAO (Pritchard et al.) model
+│   ├── pao_model                <- Pao Model
 │   ├── pure_resLSTM             <- Residual LSTM
 │   ├── squeezeformer            <- Squeezeformer architecture
 │   └── unet                     <- U-Net architecture
