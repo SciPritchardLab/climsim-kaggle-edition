@@ -140,9 +140,9 @@ This workflow design enables rapid iteration on figures without rerunning expens
 
 See individual model directories for specific dependencies.
 
-## Saved models
+## Saved Models
 
-Models, checkpoints, and normalization files have been uploaded to HuggingFace and are available [here](https://huggingface.co/jlin404/models).
+Models, checkpoints, and normalization files have been uploaded to HuggingFace and are available in the [ClimSim Kaggle Models collection](https://hf.co/collections/jlin404/climsim-kaggle-models).
 
 ## Citation
 
