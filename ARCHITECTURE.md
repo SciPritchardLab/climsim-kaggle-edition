@@ -48,9 +48,6 @@
 │       ├── *.py                    - Scripts for extracting simulation data
 │       └── *.ipynb                 - Analysis and visualization notebooks
 │
-├── figures                   <- Publication figures and analysis plots
-│   └── climsim_figures.ipynb    <- Additional figure generation notebook
-│
 ├── grid_info                 <- Grid information and mapping files
 │   ├── ClimSim_low-res_grid-info.nc           <- Grid metadata
 │   ├── map_ne4pg2_to_180x360_lowres.nc        <- Regridding weights (7.4MB)

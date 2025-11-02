@@ -34,7 +34,6 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed structure documentation.
 │
 ├── preprocessing/            # Data preparation scripts
 ├── online_ensembling/        # Online ensemble simulation scripts
-├── figures/                  # Publication figure generation
 │
 ├── preprocess_figure_data.ipynb   # Compute metrics (run first)
 └── generate_paper_figures.ipynb   # Generate visualizations (run second)
